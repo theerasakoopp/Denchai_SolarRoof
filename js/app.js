@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             tiles: [basePath + 'tiles/uav/{z}/{x}/{y}.webp'],
             tileSize: 256,
             minzoom: 14,
-            maxzoom: 19,
+            maxzoom: 20,
             bounds: [100.020, 17.960, 100.090, 18.015]
         });
 

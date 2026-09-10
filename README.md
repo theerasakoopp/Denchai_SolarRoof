@@ -20,7 +20,7 @@ Powered by **UAV-SolarNet GeoAI semantic segmentation** and ultra-high resolutio
   - **Tier 1 (2.5–5 kWp):** 1,829 facets (4.57 MWp, 1.81%) — Small residences and micro-solar.
   - **Sub-optimal (<2.5 kWp):** Structural additions and heavily shaded roof planes.
 - **3D Solar Orientation Vector Distribution:** Comprehensive tilt and azimuth classification covering South (37.82 MWp), West (44.81 MWp), East (38.39 MWp), North (34.11 MWp), Flat roofs (31.93 MWp), and Existing PV (0.72 MWp).
-- **Ultra-High Resolution UAV Imagery:** Seamless streaming of **10 cm GSD UAV photogrammetry** across Zoom levels 14–19 in modern WebP format (6,969 tiles).
+- **Ultra-High Resolution UAV Imagery:** Seamless streaming of **10 cm GSD UAV photogrammetry** across Zoom levels 14–20 in modern WebP format (27,309 tiles).
 - **Interactive Rooftop & Building Inspector:** Click any rooftop facet or building to view tilt, azimuth, usable area, PV system size, annual savings, and simple payback period.
 - **Dynamic Tariff & CAPEX Simulator:** Adjust local electricity tariffs (THB/kWh) and solar CAPEX (THB/kWp) to simulate real-time municipal clean energy returns.
 
