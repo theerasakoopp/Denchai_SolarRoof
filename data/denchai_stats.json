@@ -1,0 +1,116 @@
+{
+  "municipality": "เทศบาลตำบลเด่นชัย (Den Chai Subdistrict Municipality)",
+  "province": "แพร่ (Phrae, Thailand)",
+  "area_km2": 16.46,
+  "total_facets": 17344,
+  "total_capacity_mwp": 252.91,
+  "total_generation_gwh_yr": 316.33,
+  "total_bill_savings_thb_m_yr": 1423.47,
+  "total_co2_offset_tons_yr": 158131.3,
+  "standard_tariff_thb": 4.5,
+  "center": {
+    "lat": 17.9878,
+    "lon": 100.06,
+    "zoom": 15
+  },
+  "tiers": {
+    "Tier 3": {
+      "count": 12334,
+      "pct_count": 71.11,
+      "cap_mwp": 236.0,
+      "pct_mwp": 93.31,
+      "annual_gwh": 296.12,
+      "annual_thb_m": 1332.52,
+      "co2_ton": 148028.4,
+      "color": "#f97316"
+    },
+    "Tier 2": {
+      "count": 3181,
+      "pct_count": 18.34,
+      "cap_mwp": 12.34,
+      "pct_mwp": 4.88,
+      "annual_gwh": 14.75,
+      "annual_thb_m": 66.4,
+      "co2_ton": 7375.85,
+      "color": "#eab308"
+    },
+    "Tier 1": {
+      "count": 1829,
+      "pct_count": 10.55,
+      "cap_mwp": 4.57,
+      "pct_mwp": 1.81,
+      "annual_gwh": 5.46,
+      "annual_thb_m": 24.55,
+      "co2_ton": 2727.03,
+      "color": "#06b6d4"
+    },
+    "Sub-optimal": {
+      "count": 0,
+      "pct_count": 0.0,
+      "cap_mwp": 0.0,
+      "pct_mwp": 0.0,
+      "annual_gwh": 0.0,
+      "annual_thb_m": 0.0,
+      "co2_ton": 0.0,
+      "color": "#64748b"
+    }
+  },
+  "orientations": {
+    "Nroof": {
+      "label": "North (ทิศเหนือ)",
+      "count": 2590,
+      "area_m2": 170577.4,
+      "cap_mwp": 34.11,
+      "annual_gwh": 42.13,
+      "annual_thb_m": 189.57
+    },
+    "Eroof": {
+      "label": "East (ทิศตะวันออก)",
+      "count": 3209,
+      "area_m2": 191931.6,
+      "cap_mwp": 38.39,
+      "annual_gwh": 47.82,
+      "annual_thb_m": 215.17
+    },
+    "Sroof": {
+      "label": "South (ทิศใต้)",
+      "count": 2868,
+      "area_m2": 189072.4,
+      "cap_mwp": 37.82,
+      "annual_gwh": 47.97,
+      "annual_thb_m": 215.85
+    },
+    "Wroof": {
+      "label": "West (ทิศตะวันตก)",
+      "count": 3332,
+      "area_m2": 224063.1,
+      "cap_mwp": 44.81,
+      "annual_gwh": 55.45,
+      "annual_thb_m": 249.54
+    },
+    "Froof": {
+      "label": "Flat (ดาดฟ้าเรียบ)",
+      "count": 1728,
+      "area_m2": 159642.2,
+      "cap_mwp": 31.93,
+      "annual_gwh": 40.1,
+      "annual_thb_m": 180.47
+    },
+    "Uroof": {
+      "label": "Unsuitable (ไม่เหมาะสม)",
+      "count": 3546,
+      "area_m2": 325688.3,
+      "cap_mwp": 65.14,
+      "annual_gwh": 81.96,
+      "annual_thb_m": 368.84
+    },
+    "PV": {
+      "label": "Existing PV (ติดตั้งแล้ว)",
+      "count": 71,
+      "area_m2": 3578.9,
+      "cap_mwp": 0.72,
+      "annual_gwh": 0.9,
+      "annual_thb_m": 4.03
+    }
+  }
+}

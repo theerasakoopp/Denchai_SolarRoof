@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Den Chai SolarRoof | ระบบสารสนเทศภูมิศาสตร์ศักยภาพโซลาร์เซลล์บนหลังคา เทศบาลตำบลเด่นชัย</title>
+    <meta name="description" content="ระบบสารสนเทศภูมิศาสตร์ (WebGIS) ประเมินศักยภาพพลังงานแสงอาทิตย์บนหลังคาอาคาร 3 มิติ เทศบาลตำบลเด่นชัย จังหวัดแพร่ ด้วยเทคโนโลยี GeoAI และภาพถ่าย UAV 10 ซม.">
+    
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- MapLibre GL JS -->
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- ================= MAP CONTAINER ================= -->
+    <div id="map"></div>
+
+    <!-- ================= FLOATING MAP CONTROLS ================= -->
+    <div class="floating-controls">
+        <button class="control-btn" onclick="window.toggleLayerPanel()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+            ชั้นข้อมูล (Layers)
+        </button>
+        
+        <div id="layer-panel" class="layer-panel">
+            <div style="font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px;">
+                ภาพถ่ายทางอากาศ & ชั้นข้อมูล
+            </div>
+            
+            <div class="layer-item">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="chk-uav" checked onchange="window.toggleUavLayer(this)">
+                    <span>🛸 UAV Orthophoto <b>(10 ซม.)</b></span>
+                </label>
+            </div>
+
+            <div class="layer-item">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="chk-facets" checked onchange="window.toggleFacetsLayer(this)">
+                    <span>🏢 ระนาบหลังคา 3D <b>(17,344 ระนาบ)</b></span>
+                </label>
+            </div>
+
+            <div class="layer-item">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="chk-buildings" onchange="window.toggleBuildingsLayer(this)">
+                    <span>🏗️ ขอบเขตอาคารรวม <b>(5,558 อาคาร)</b></span>
+                </label>
+            </div>
+
+            <div class="layer-item">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="chk-admin" checked onchange="window.toggleAdminLayer(this)">
+                    <span>📍 ขอบเขตเทศบาลตำบลเด่นชัย</span>
+                </label>
+            </div>
+
+            <div style="font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin: 12px 0 8px;">
+                แผนที่ฐาน (Basemaps)
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;">
+                <button class="control-btn base-btn active" data-base="base-carto" style="padding: 6px; font-size: 0.72rem; justify-content: center;" onclick="window.switchBasemap('base-carto')">Dark</button>
+                <button class="control-btn base-btn" data-base="base-satellite" style="padding: 6px; font-size: 0.72rem; justify-content: center;" onclick="window.switchBasemap('base-satellite')">Satellite</button>
+                <button class="control-btn base-btn" data-base="base-osm" style="padding: 6px; font-size: 0.72rem; justify-content: center;" onclick="window.switchBasemap('base-osm')">OSM</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toggle Button to Open Sidebar when collapsed -->
+    <button class="sidebar-toggle-btn" onclick="window.toggleSidebar()" title="เปิดแผงควบคุม">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+    </button>
+
+    <!-- ================= SIDEBAR ANALYTICS ================= -->
+    <aside id="sidebar" class="sidebar">
+        <!-- Header Branding -->
+        <div class="sidebar-header">
+            <div class="brand">
+                <div class="brand-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                </div>
+                <div class="brand-text">
+                    <h1>Denchai <span>SolarRoof</span></h1>
+                    <p>เทศบาลตำบลเด่นชัย จ.แพร่ (16.46 ตร.กม.)</p>
+                </div>
+            </div>
+            <button class="collapse-btn" onclick="window.toggleSidebar()" title="ย่อแถบด้านข้าง">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+        </div>
+
+        <!-- Mode Switcher Bar -->
+        <div class="mode-switcher-bar">
+            <button class="mode-btn active" id="btn-mode-facets" onclick="window.setDashboardMode('facets')">
+                <span>🏢 ระนาบ 3D</span>
+            </button>
+            <button class="mode-btn" id="btn-mode-buildings" onclick="window.setDashboardMode('buildings')">
+                <span>🏗️ อาคารรวม</span>
+            </button>
+            <button class="mode-btn" id="btn-mode-overview" onclick="window.setDashboardMode('overview')">
+                <span>🌐 ภาพรวม</span>
+            </button>
+        </div>
+
+        <!-- Scrollable Analytics Body -->
+        <div class="sidebar-body">
+            <!-- Dynamic Comparison / Summary Card Container -->
+            <div id="comparison-container" style="display: none;"></div>
+
+            <!-- Municipal KPI Cards -->
+            <div class="metrics-grid">
+                <div class="metric-card full-width">
+                    <div class="metric-label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                        ศักยภาพการผลิตรวม (Total Capacity)
+                    </div>
+                    <div class="metric-value">
+                        <span id="kpi-capacity">252.91</span>
+                        <span class="metric-unit">MWp</span>
+                    </div>
+                    <div class="metric-sub" id="kpi-sub-cap">รองรับการติดตั้งแผงโซลาร์เซลล์บนหลังคา 17,344 ระนาบ</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">ผลผลิตไฟฟ้าต่อปี</div>
+                    <div class="metric-value">
+                        <span id="kpi-generation">316.33</span>
+                        <span class="metric-unit">GWh</span>
+                    </div>
+                    <div class="metric-sub">316.33 ล้านหน่วย/ปี</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">ประหยัดค่าไฟรวม</div>
+                    <div class="metric-value" style="color: #10b981;">
+                        <span id="kpi-savings">1,423.47</span>
+                        <span class="metric-unit">ล้าน฿</span>
+                    </div>
+                    <div class="metric-sub">คิดที่อัตรา 4.50 บาท/หน่วย</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label" id="kpi-label-count">ระนาบหลังคาทั้งหมด</div>
+                    <div class="metric-value">
+                        <span id="kpi-facets">17,344</span>
+                        <span class="metric-unit" id="kpi-unit-count">ระนาบ</span>
+                    </div>
+                    <div class="metric-sub" id="kpi-sub-area">พื้นที่หลังคา 1,264,554 m²</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">ลดก๊าซเรือนกระจก</div>
+                    <div class="metric-value" style="color: #38bdf8;">
+                        <span id="kpi-co2">158,131</span>
+                        <span class="metric-unit">ตัน</span>
+                    </div>
+                    <div class="metric-sub">tCO₂e / ปี (SDG 7 & 13)</div>
+                </div>
+            </div>
+
+            <!-- Capacity Tiers Interactive Filter -->
+            <div>
+                <div class="section-title">
+                    <span>กลุ่มศักยภาพ 4 Tiers (คลิกเพื่อกรอง)</span>
+                    <span style="font-size: 0.7rem; color: #f97316;">DEDE & EIT</span>
+                </div>
+                <div id="tier-list-container">
+                    <!-- Populated dynamically by app.js -->
+                </div>
+            </div>
+
+            <!-- Orientation Breakdown Widget -->
+            <div id="orientation-section" style="margin-top: 14px;">
+                <div class="section-title">
+                    <span>การกระจายตัวตามทิศหลังคา (Orientations)</span>
+                    <span style="font-size: 0.7rem; color: #38bdf8;">3D Solar Vector</span>
+                </div>
+                <div id="orient-list-container" style="display: flex; flex-direction: column; gap: 6px;">
+                    <!-- Populated dynamically by app.js -->
+                </div>
+            </div>
+
+            <!-- ROI & Investment Simulator -->
+            <div class="calc-card">
+                <div class="calc-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    เครื่องจำลองความคุ้มค่าการลงทุน (ROI Simulator)
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <span>อัตราค่าไฟฟ้า (Tariff):</span>
+                        <span id="tariff-val" class="slider-val">4.50 ฿</span>
+                    </div>
+                    <input type="range" min="3.00" max="6.00" step="0.25" value="4.50" oninput="window.updateTariff(this.value)">
+                </div>
+
+                <div class="slider-group" style="margin-bottom: 0;">
+                    <div class="slider-header">
+                        <span>ต้นทุนติดตั้งเฉลี่ยต่อ kWp:</span>
+                        <span id="cost-val" class="slider-val">32,000 ฿</span>
+                    </div>
+                    <input type="range" min="25000" max="45000" step="1000" value="32000" oninput="window.updateCostPerKwp(this.value)">
+                </div>
+            </div>
+
+            <!-- Instruction Box -->
+            <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--border-subtle); border-radius: 10px; padding: 12px; font-size: 0.74rem; color: var(--text-secondary); line-height: 1.5;">
+                💡 <b>วิธีใช้งาน:</b> ซูมแผนที่เพื่อดูภาพโดรนความละเอียดสูง <b>10 ซม.</b> และคลิกที่ระนาบหลังคาหรืออาคารเพื่อดูขนาดกำลังผลิต (kWp), ผลผลิตพลังงาน, เงินที่ประหยัดได้ และระยะเวลาคืนทุนรายหลังคา
+            </div>
+        </div>
+
+        <!-- Sidebar Footer -->
+        <div class="sidebar-footer">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>UAV-SolarNet GeoAI Framework</span>
+                <span style="color: #10b981;">v2.0 Active</span>
+            </div>
+            <div class="footer-links">
+                <a href="https://github.com/theerasakoopp/Denchai_SolarRoof" target="_blank" class="footer-link">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    GitHub Source
+                </a>
+                <span>•</span>
+                <span>Elsevier RSASE 2026</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Logic -->
+    <script src="js/app.js"></script>
+</body>
+</html>
