@@ -36,6 +36,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         style: {
             version: 8,
             sources: {
+                'carto-light': {
+                    type: 'raster',
+                    tiles: [
+                        'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+                        'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+                        'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png'
+                    ],
+                    tileSize: 256,
+                    attribution: '&copy; <a href="https://carto.com/">CARTO</a>'
+                },
                 'carto-dark': {
                     type: 'raster',
                     tiles: [
@@ -63,10 +73,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             },
             layers: [
                 {
+                    id: 'base-light',
+                    type: 'raster',
+                    source: 'carto-light',
+                    layout: { visibility: 'visible' }
+                },
+                {
                     id: 'base-carto',
                     type: 'raster',
                     source: 'carto-dark',
-                    layout: { visibility: 'visible' }
+                    layout: { visibility: 'none' }
                 },
                 {
                     id: 'base-satellite',
@@ -467,12 +483,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ── Basemap & Layer Switching ──
     window.switchBasemap = function(baseId) {
-        ['base-carto', 'base-satellite', 'base-osm'].forEach(id => {
-            map.setLayoutProperty(id, 'visibility', id === baseId ? 'visible' : 'none');
+        ['base-light', 'base-carto', 'base-satellite', 'base-osm'].forEach(id => {
+            if (map.getLayer(id)) {
+                map.setLayoutProperty(id, 'visibility', id === baseId ? 'visible' : 'none');
+            }
         });
         document.querySelectorAll('.base-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.base === baseId);
         });
+    };
+
+    window.toggleTheme = function() {
+        document.body.classList.toggle('theme-light');
+        const isLight = document.body.classList.contains('theme-light');
+        window.switchBasemap(isLight ? 'base-light' : 'base-carto');
     };
 
     window.toggleUavLayer = function(checkbox) {

@@ -61,6 +61,7 @@ body {
     width: 100vw;
     height: 100vh;
     z-index: 1;
+    background-color: #ffffff;
 }
 
 /* MapLibre Popup Customization */
@@ -635,4 +636,176 @@ input[type=range]::-webkit-slider-thumb {
         position: absolute;
     }
 }
+
+/* ==========================================================================
+   Light Translucent Glassmorphic Theme ("สีขาวโปร่ง")
+   ========================================================================== */
+body.theme-light {
+    --bg-base: #ffffff;
+    --bg-surface: rgba(255, 255, 255, 0.88);
+    --bg-surface-hover: rgba(248, 250, 252, 0.95);
+    --bg-card: rgba(255, 255, 255, 0.82);
+    --border-subtle: rgba(15, 23, 42, 0.08);
+    --border-highlight: rgba(15, 23, 42, 0.16);
+    
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    color: #0f172a;
+    background-color: #ffffff;
+}
+
+body.theme-light .sidebar {
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 10px 0 35px rgba(0, 0, 0, 0.06);
+}
+
+body.theme-light .sidebar-header {
+    background: rgba(255, 255, 255, 0.92);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+body.theme-light .brand-text h1 {
+    color: #0f172a;
+}
+
+body.theme-light .metric-card {
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(15, 23, 42, 0.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+body.theme-light .metric-card:hover {
+    border-color: rgba(15, 23, 42, 0.18);
+    background: rgba(255, 255, 255, 0.95);
+}
+
+body.theme-light .metric-card.full-width {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(234, 179, 8, 0.04) 100%);
+    border-color: rgba(249, 115, 22, 0.25);
+}
+
+body.theme-light .metric-value,
+body.theme-light .tier-name,
+body.theme-light .tier-mwp {
+    color: #0f172a;
+}
+
+body.theme-light .mode-switcher-bar {
+    background: rgba(15, 23, 42, 0.05);
+    border-color: rgba(15, 23, 42, 0.08);
+}
+
+body.theme-light .mode-btn {
+    color: #475569;
+}
+
+body.theme-light .mode-btn:hover {
+    color: #0f172a;
+    background: rgba(255, 255, 255, 0.6);
+}
+
+body.theme-light .mode-btn.active {
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .tier-item {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(15, 23, 42, 0.08);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+body.theme-light .tier-item:hover {
+    background: #ffffff;
+    border-color: rgba(15, 23, 42, 0.15);
+}
+
+body.theme-light .tier-item.active {
+    background: #ffffff;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+}
+
+body.theme-light .calc-card {
+    background: rgba(16, 185, 129, 0.06);
+    border-color: rgba(16, 185, 129, 0.25);
+}
+
+body.theme-light .calc-title {
+    color: #059669;
+}
+
+body.theme-light .slider-header {
+    color: #334155;
+}
+
+body.theme-light .slider-val {
+    color: #059669;
+}
+
+body.theme-light .comparison-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(15, 23, 42, 0.1);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+}
+
+body.theme-light .comp-table th {
+    background: rgba(15, 23, 42, 0.04);
+    color: #475569;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+body.theme-light .comp-table td {
+    color: #0f172a;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+}
+
+body.theme-light .floating-controls .control-btn,
+body.theme-light .layer-panel,
+body.theme-light .sidebar-toggle-btn {
+    background: rgba(255, 255, 255, 0.92) !important;
+    backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(15, 23, 42, 0.1) !important;
+    color: #0f172a !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+}
+
+body.theme-light .layer-panel {
+    color: #0f172a;
+}
+
+body.theme-light .layer-item:hover {
+    background: rgba(15, 23, 42, 0.04);
+}
+
+body.theme-light .maplibregl-popup-content {
+    background: rgba(255, 255, 255, 0.96) !important;
+    backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(15, 23, 42, 0.12) !important;
+    color: #0f172a !important;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.12) !important;
+}
+
+body.theme-light .maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+    border-top-color: rgba(255, 255, 255, 0.96) !important;
+}
+
+body.theme-light .sidebar-footer {
+    background: rgba(255, 255, 255, 0.9);
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+    color: #64748b;
+}
+
+body.theme-light .footer-link {
+    color: #475569;
+}
+
+body.theme-light .footer-link:hover {
+    color: #0f172a;
+}
+
 
