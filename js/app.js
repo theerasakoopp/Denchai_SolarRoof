@@ -21,8 +21,73 @@ let hoveredSource = null;
 let popup = null;
 let isMapLoaded = false;
 const pendingActions = [];
+const deletedFacetIds = new Set();
 
 // ── Top-Level Window API (Defined immediately to guarantee zero inline onclick errors) ──
+
+window.deleteFacet = async function(facetId) {
+    if (!facetId) return;
+    if (!confirm(`ยืนยันการลบระนาบ [${facetId}] ออกจากระบบใช่หรือไม่?\n(เช่น ตรวจพบว่าเป็นถนนหรือพื้นดินที่แปลผลคลาดเคลื่อน)`)) {
+        return;
+    }
+
+    deletedFacetIds.add(String(facetId));
+    applyDeletedFacetsFilter();
+
+    if (popup && popup.isOpen()) popup.remove();
+
+    try {
+        const res = await fetch('/api/delete_facet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: facetId })
+        });
+        const result = await res.json();
+        if (result.success) {
+            showToast(`🗑️ ลบระนาบ ${facetId} เรียบร้อยแล้ว (เหลือ ${result.remaining_facets.toLocaleString()} ระนาบ)`);
+            if (denchaiStats) {
+                denchaiStats.total_facets = result.remaining_facets;
+                const kpiF = document.getElementById('kpi-facets');
+                if (kpiF) kpiF.textContent = result.remaining_facets.toLocaleString();
+            }
+        } else {
+            showToast(`⚠️ เกิดข้อผิดพลาดในการลบ: ${result.error || 'Unknown error'}`);
+        }
+    } catch (err) {
+        console.error('Delete error:', err);
+        showToast(`🗑️ ลบระนาบ ${facetId} ออกจากมุมมองแผนที่แล้ว`);
+    }
+};
+
+function applyDeletedFacetsFilter() {
+    if (!isMapLoaded || deletedFacetIds.size === 0) return;
+    const delList = Array.from(deletedFacetIds);
+    const excludeFilter = ['!', ['in', ['to-string', ['get', 'id']], ['literal', delList]]];
+    const tierFilter = ['match', ['get', 'tier'], Array.from(activeTiers), true, false];
+    const combinedFilter = ['all', tierFilter, excludeFilter];
+
+    if (map.getLayer('layer-facets-fill')) map.setFilter('layer-facets-fill', combinedFilter);
+    if (map.getLayer('layer-facets-stroke')) map.setFilter('layer-facets-stroke', combinedFilter);
+    if (map.getLayer('layer-facets-3d')) map.setFilter('layer-facets-3d', combinedFilter);
+}
+
+function showToast(msg) {
+    let toast = document.getElementById('webgis-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'webgis-toast';
+        toast.style.cssText = 'position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); color: #fff; border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 10px; padding: 10px 18px; font-size: 0.8rem; font-weight: 600; z-index: 9999; box-shadow: 0 10px 30px rgba(0,0,0,0.6); transition: opacity 0.3s ease; display: flex; align-items: center; gap: 8px;';
+        document.body.appendChild(toast);
+    }
+    toast.innerHTML = msg;
+    toast.style.opacity = '1';
+    toast.style.display = 'flex';
+    clearTimeout(window._toastTimeout);
+    window._toastTimeout = setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => { toast.style.display = 'none'; }, 300);
+    }, 4000);
+}
 
 window.toggle3DCity = function() {
     if (!isMapLoaded) {
@@ -285,13 +350,19 @@ window.toggleTier = function(tierName) {
     if (!isMapLoaded) return;
 
     const filterExp = ['match', ['get', 'tier'], Array.from(activeTiers), true, false];
+    let facetFilter = filterExp;
+    if (deletedFacetIds.size > 0) {
+        const delList = Array.from(deletedFacetIds);
+        const excludeFilter = ['!', ['in', ['to-string', ['get', 'id']], ['literal', delList]]];
+        facetFilter = ['all', filterExp, excludeFilter];
+    }
 
-    if (map.getLayer('layer-facets-fill')) map.setFilter('layer-facets-fill', filterExp);
-    if (map.getLayer('layer-facets-stroke')) map.setFilter('layer-facets-stroke', filterExp);
+    if (map.getLayer('layer-facets-fill')) map.setFilter('layer-facets-fill', facetFilter);
+    if (map.getLayer('layer-facets-stroke')) map.setFilter('layer-facets-stroke', facetFilter);
     if (map.getLayer('layer-buildings-fill')) map.setFilter('layer-buildings-fill', filterExp);
     if (map.getLayer('layer-buildings-line')) map.setFilter('layer-buildings-line', filterExp);
     if (map.getLayer('layer-buildings-3d')) map.setFilter('layer-buildings-3d', filterExp);
-    if (map.getLayer('layer-facets-3d')) map.setFilter('layer-facets-3d', filterExp);
+    if (map.getLayer('layer-facets-3d')) map.setFilter('layer-facets-3d', facetFilter);
 };
 
 window.switchBasemap = function(baseId) {
@@ -874,6 +945,15 @@ function showInspectorPopup(props, type, lngLat) {
             <div style="margin-top: 6px; font-size: 0.72rem; color: #10b981; display: flex; align-items: center; gap: 4px;">
                 🌱 ลดการปล่อยก๊าซเรือนกระจก: <b>${co2_ton} tCO₂e/ปี</b>
             </div>
+
+            <!-- Section 6: False Positive / Road Deletion Action -->
+            ${!isBuilding ? `
+            <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15); display: flex; justify-content: flex-end;">
+                <button onclick="window.deleteFacet('${props.id}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 5px 12px; border-radius: 6px; font-size: 0.72rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.4)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'" title="ลบระนาบนี้ออกจากระบบหากตรวจพบว่าเป็นถนน หรือพื้นดินที่แปลผลคลาดเคลื่อน">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    <span>🗑️ ลบ Facet นี้ (ไม่ใช่หลังคา / ถนน)</span>
+                </button>
+            </div>` : ''}
         </div>
     `;
 
