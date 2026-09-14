@@ -2,11 +2,11 @@
   "municipality": "เทศบาลตำบลเด่นชัย (Den Chai Subdistrict Municipality)",
   "province": "แพร่ (Phrae, Thailand)",
   "area_km2": 16.46,
-  "total_facets": 17344,
-  "total_capacity_mwp": 252.91,
-  "total_generation_gwh_yr": 316.33,
-  "total_bill_savings_thb_m_yr": 1423.47,
-  "total_co2_offset_tons_yr": 158131.3,
+  "total_facets": 16573,
+  "total_capacity_mwp": 103.94,
+  "total_generation_gwh_yr": 131.21,
+  "total_bill_savings_thb_m_yr": 590.45,
+  "total_co2_offset_tons_yr": 65605.1,
   "standard_tariff_thb": 4.5,
   "center": {
     "lat": 17.9878,
@@ -15,102 +15,109 @@
   },
   "tiers": {
     "Tier 3": {
-      "count": 12334,
-      "pct_count": 71.11,
-      "cap_mwp": 236.0,
-      "pct_mwp": 93.31,
-      "annual_gwh": 296.12,
-      "annual_thb_m": 1332.52,
-      "co2_ton": 148028.4,
-      "color": "#f97316"
+      "count": 1217,
+      "cap_mwp": 40.5,
+      "annual_gwh": 51.98,
+      "annual_thb_m": 233.93,
+      "co2_ton": 25991.92,
+      "color": "#f97316",
+      "pct_count": 7.34,
+      "pct_mwp": 38.96
     },
     "Tier 2": {
-      "count": 3181,
-      "pct_count": 18.34,
-      "cap_mwp": 12.34,
-      "pct_mwp": 4.88,
-      "annual_gwh": 14.75,
-      "annual_thb_m": 66.4,
-      "co2_ton": 7375.85,
-      "color": "#eab308"
+      "count": 5402,
+      "cap_mwp": 45.23,
+      "annual_gwh": 56.98,
+      "annual_thb_m": 256.42,
+      "co2_ton": 28490.58,
+      "color": "#eab308",
+      "pct_count": 32.6,
+      "pct_mwp": 43.51
     },
     "Tier 1": {
-      "count": 1829,
-      "pct_count": 10.55,
-      "cap_mwp": 4.57,
-      "pct_mwp": 1.81,
-      "annual_gwh": 5.46,
-      "annual_thb_m": 24.55,
-      "co2_ton": 2727.03,
-      "color": "#06b6d4"
+      "count": 3640,
+      "cap_mwp": 13.07,
+      "annual_gwh": 16.04,
+      "annual_thb_m": 72.16,
+      "co2_ton": 8018.64,
+      "color": "#06b6d4",
+      "pct_count": 21.96,
+      "pct_mwp": 12.57
     },
     "Sub-optimal": {
-      "count": 0,
-      "pct_count": 0.0,
-      "cap_mwp": 0.0,
-      "pct_mwp": 0.0,
-      "annual_gwh": 0.0,
-      "annual_thb_m": 0.0,
-      "co2_ton": 0.0,
-      "color": "#64748b"
+      "count": 6314,
+      "cap_mwp": 5.14,
+      "annual_gwh": 6.21,
+      "annual_thb_m": 27.94,
+      "co2_ton": 3104.35,
+      "color": "#64748b",
+      "pct_count": 38.1,
+      "pct_mwp": 4.95
     }
   },
   "orientations": {
     "Nroof": {
       "label": "North (ทิศเหนือ)",
-      "count": 2590,
-      "area_m2": 170577.4,
-      "cap_mwp": 34.11,
-      "annual_gwh": 42.13,
-      "annual_thb_m": 189.57
+      "count": 2626,
+      "area_m2": 172842.7,
+      "cap_mwp": 20.74,
+      "annual_gwh": 25.89,
+      "annual_thb_m": 116.49
     },
     "Eroof": {
       "label": "East (ทิศตะวันออก)",
-      "count": 3209,
-      "area_m2": 191931.6,
-      "cap_mwp": 38.39,
-      "annual_gwh": 47.82,
-      "annual_thb_m": 215.17
+      "count": 3123,
+      "area_m2": 187059.1,
+      "cap_mwp": 22.44,
+      "annual_gwh": 28.3,
+      "annual_thb_m": 127.36
     },
     "Sroof": {
       "label": "South (ทิศใต้)",
-      "count": 2868,
-      "area_m2": 189072.4,
-      "cap_mwp": 37.82,
-      "annual_gwh": 47.97,
-      "annual_thb_m": 215.85
+      "count": 2627,
+      "area_m2": 175713.0,
+      "cap_mwp": 21.08,
+      "annual_gwh": 27.17,
+      "annual_thb_m": 122.25
     },
     "Wroof": {
       "label": "West (ทิศตะวันตก)",
-      "count": 3332,
-      "area_m2": 224063.1,
-      "cap_mwp": 44.81,
-      "annual_gwh": 55.45,
-      "annual_thb_m": 249.54
+      "count": 3254,
+      "area_m2": 220140.0,
+      "cap_mwp": 26.42,
+      "annual_gwh": 33.05,
+      "annual_thb_m": 148.71
     },
     "Froof": {
       "label": "Flat (ดาดฟ้าเรียบ)",
-      "count": 1728,
-      "area_m2": 159642.2,
-      "cap_mwp": 31.93,
-      "annual_gwh": 40.1,
-      "annual_thb_m": 180.47
+      "count": 1515,
+      "area_m2": 132580.3,
+      "cap_mwp": 13.26,
+      "annual_gwh": 16.81,
+      "annual_thb_m": 75.63
     },
     "Uroof": {
       "label": "Unsuitable (ไม่เหมาะสม)",
-      "count": 3546,
-      "area_m2": 325688.3,
-      "cap_mwp": 65.14,
-      "annual_gwh": 81.96,
-      "annual_thb_m": 368.84
+      "count": 3352,
+      "area_m2": 309636.6,
+      "cap_mwp": 0.0,
+      "annual_gwh": 0.0,
+      "annual_thb_m": 0.0
     },
     "PV": {
-      "label": "Existing PV (ติดตั้งแล้ว)",
-      "count": 71,
-      "area_m2": 3578.9,
-      "cap_mwp": 0.72,
-      "annual_gwh": 0.9,
-      "annual_thb_m": 4.03
+      "label": "Existing PV (มีโซลาร์เดิม)",
+      "count": 76,
+      "area_m2": 3544.1,
+      "cap_mwp": 0.0,
+      "annual_gwh": 0.0,
+      "annual_thb_m": 0.0
     }
+  },
+  "metadata": {
+    "model": "Champion U-Net (ResNet-101)",
+    "validation": "5-Fold Cross-Validation Ensemble",
+    "channels": "7-Channel Multi-Modal (RGB + nDSM + Aspect + Slope)",
+    "gsd_m": 0.05,
+    "timestamp": "2026-09-14 11:52:29"
   }
 }
