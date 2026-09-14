@@ -22,31 +22,39 @@ class WebGISHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Expires', '0')
         super().end_headers()
 
+    def send_json(self, status_code, data_obj):
+        resp_bytes = json.dumps(data_obj, ensure_ascii=False).encode('utf-8')
+        self.send_response(status_code)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Content-Length', str(len(resp_bytes)))
+        self.send_header('Connection', 'close')
+        self.end_headers()
+        self.wfile.write(resp_bytes)
+
     def do_POST(self):
         if self.path == '/api/delete_facet':
             content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length).decode('utf-8')
+            body = self.rfile.read(content_length).decode('utf-8') if content_length > 0 else '{}'
             try:
                 req = json.loads(body)
             except Exception:
                 req = {}
             
             target_ids = set()
-            if 'id' in req:
+            if 'id' in req and req['id']:
                 target_ids.add(str(req['id']))
             if 'ids' in req and isinstance(req['ids'], list):
-                target_ids.update(str(x) for x in req['ids'])
+                target_ids.update(str(x) for x in req['ids'] if x)
 
             if not target_ids:
-                self.send_response(400)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                self.wfile.write(b'{"success": false, "error": "No ID provided"}')
-                return
+                return self.send_json(400, {'success': False, 'error': 'No ID provided'})
 
             # Ensure backup exists before modification
-            if not os.path.exists(BACKUP_PATH):
+            if not os.path.exists(BACKUP_PATH) and os.path.exists(FACETS_PATH):
                 shutil.copy2(FACETS_PATH, BACKUP_PATH)
+
+            if not os.path.exists(FACETS_PATH):
+                return self.send_json(404, {'success': False, 'error': 'Facets file not found'})
 
             with open(FACETS_PATH, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -60,8 +68,11 @@ class WebGISHandler(http.server.SimpleHTTPRequestHandler):
             deleted_count = orig_len - new_len
 
             if deleted_count > 0:
-                with open(FACETS_PATH, 'w', encoding='utf-8') as f:
+                # Atomic write to prevent file corruption
+                temp_facets = FACETS_PATH + '.tmp'
+                with open(temp_facets, 'w', encoding='utf-8') as f:
                     json.dump(data, f, ensure_ascii=False)
+                os.replace(temp_facets, FACETS_PATH)
 
                 # Recalculate statistics in denchai_stats.json
                 if os.path.exists(STATS_PATH):
@@ -78,37 +89,32 @@ class WebGISHandler(http.server.SimpleHTTPRequestHandler):
                     stats['total_bill_savings_thb_m_yr'] = round(total_gen * 1e6 * tariff / 1e6, 2)
                     stats['total_co2_offset_tons_yr'] = round(total_gen * 1e6 * 0.0004999, 1)
 
-                    with open(STATS_PATH, 'w', encoding='utf-8') as f:
+                    temp_stats = STATS_PATH + '.tmp'
+                    with open(temp_stats, 'w', encoding='utf-8') as f:
                         json.dump(stats, f, ensure_ascii=False, indent=2)
+                    os.replace(temp_stats, STATS_PATH)
 
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            resp = json.dumps({
+            print(f"[QA DELETION] Deleted {deleted_count} facets: {list(target_ids)} | Remaining: {new_len}", flush=True)
+
+            return self.send_json(200, {
                 'success': True,
                 'deleted_ids': list(target_ids),
                 'deleted_count': deleted_count,
                 'remaining_facets': new_len
             })
-            self.wfile.write(resp.encode('utf-8'))
-            return
 
         elif self.path == '/api/restore_all':
             if os.path.exists(BACKUP_PATH):
                 shutil.copy2(BACKUP_PATH, FACETS_PATH)
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                self.wfile.write(b'{"success": true, "message": "Restored all facets from backup"}')
+                print("[RESTORE] Restored all facets from backup", flush=True)
+                return self.send_json(200, {'success': True, 'message': 'Restored all facets from backup'})
             else:
-                self.send_response(404)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                self.wfile.write(b'{"success": false, "error": "No backup found"}')
-            return
+                return self.send_json(404, {'success': False, 'error': 'No backup found'})
 
         else:
             self.send_response(404)
+            self.send_header('Content-Length', '0')
+            self.send_header('Connection', 'close')
             self.end_headers()
 
 if __name__ == '__main__':
