@@ -27,7 +27,7 @@ const deletedFacetIds = new Set();
 
 window.deleteFacet = async function(facetId) {
     if (!facetId) return;
-    if (!confirm(`ยืนยันการลบระนาบ [${facetId}] ออกจากระบบใช่หรือไม่?\n(เช่น ตรวจพบว่าเป็นถนนหรือพื้นดินที่แปลผลคลาดเคลื่อน)`)) {
+    if (!confirm(`ยืนยันการลบระนาบ [${facetId}] ออกจากระบบและบันทึกลงไฟล์ GeoJSON ทันทีใช่หรือไม่?\n(เช่น ตรวจพบว่าเป็นถนนหรือพื้นดินที่แปลผลคลาดเคลื่อน)`)) {
         return;
     }
 
@@ -44,18 +44,39 @@ window.deleteFacet = async function(facetId) {
         });
         const result = await res.json();
         if (result.success) {
-            showToast(`🗑️ ลบระนาบ ${facetId} เรียบร้อยแล้ว (เหลือ ${result.remaining_facets.toLocaleString()} ระนาบ)`);
+            showToast(`💾 บันทึกอัตโนมัติสำเร็จ! ตัดระนาบ [${facetId}] ออกจาก denchai_solar_facets.geojson เรียบร้อยแล้ว (คงเหลือ ${result.remaining_facets.toLocaleString()} ระนาบ)`);
             if (denchaiStats) {
                 denchaiStats.total_facets = result.remaining_facets;
                 const kpiF = document.getElementById('kpi-facets');
                 if (kpiF) kpiF.textContent = result.remaining_facets.toLocaleString();
             }
         } else {
-            showToast(`⚠️ เกิดข้อผิดพลาดในการลบ: ${result.error || 'Unknown error'}`);
+            showToast(`⚠️ เกิดข้อผิดพลาดในการบันทึก: ${result.error || 'Unknown error'}`);
         }
     } catch (err) {
         console.error('Delete error:', err);
         showToast(`🗑️ ลบระนาบ ${facetId} ออกจากมุมมองแผนที่แล้ว`);
+    }
+};
+
+window.exportCleanedGeoJSON = async function() {
+    try {
+        showToast('⏳ กำลังเตรียมไฟล์ GeoJSON ฉบับล่าสุด...');
+        const res = await fetch('data/denchai_solar_facets.geojson?t=' + Date.now());
+        const data = await res.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/geo+json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `denchai_solar_facets_cleaned_${new Date().toISOString().slice(0,10)}.geojson`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast(`✅ ส่งออกไฟล์ GeoJSON (${data.features.length.toLocaleString()} ระนาบ) สำเร็จแล้ว!`);
+    } catch (e) {
+        console.error(e);
+        showToast('⚠️ ไม่สามารถดาวน์โหลดไฟล์ได้');
     }
 };
 
