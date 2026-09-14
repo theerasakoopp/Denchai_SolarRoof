@@ -50,12 +50,59 @@ window.deleteFacet = async function(facetId) {
                 const kpiF = document.getElementById('kpi-facets');
                 if (kpiF) kpiF.textContent = result.remaining_facets.toLocaleString();
             }
+            // Update map sources in real-time
+            const buster = '?t=' + Date.now();
+            if (map && map.getSource('solar-facets')) {
+                map.getSource('solar-facets').setData(basePath + 'data/denchai_solar_facets.geojson' + buster);
+            }
+            if (map && map.getSource('denchai-buildings')) {
+                map.getSource('denchai-buildings').setData(basePath + 'data/denchai_buildings.geojson' + buster);
+            }
         } else {
             showToast(`⚠️ เกิดข้อผิดพลาดในการบันทึก: ${result.error || 'Unknown error'}`);
         }
     } catch (err) {
         console.error('Delete error:', err);
         showToast(`🗑️ ลบระนาบ ${facetId} ออกจากมุมมองแผนที่แล้ว`);
+    }
+};
+
+window.deleteBuilding = async function(bldId) {
+    if (!bldId) return;
+    if (!confirm(`ยืนยันการลบอาคาร [${bldId}] พร้อมระนาบหลังคาทั้งหมดของอาคารนี้ออกจากระบบใช่หรือไม่?\n(เหมาะสำหรับกรณีถนนหรือลานดินทั้งหลังที่โมเดลแปลผลผิด)`)) {
+        return;
+    }
+
+    if (popup && popup.isOpen()) popup.remove();
+
+    try {
+        const res = await fetch('/api/delete_building', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ building_id: bldId })
+        });
+        const result = await res.json();
+        if (result.success) {
+            showToast(`💾 บันทึกสำเร็จ! ลบอาคาร [${bldId}] (รวม ${result.deleted_facet_count} ระนาบ) ออกจากฐานข้อมูลเรียบร้อยแล้ว`);
+            // Force reload MapLibre sources
+            const buster = '?t=' + Date.now();
+            if (map && map.getSource('solar-facets')) {
+                map.getSource('solar-facets').setData(basePath + 'data/denchai_solar_facets.geojson' + buster);
+            }
+            if (map && map.getSource('denchai-buildings')) {
+                map.getSource('denchai-buildings').setData(basePath + 'data/denchai_buildings.geojson' + buster);
+            }
+            if (denchaiStats) {
+                denchaiStats.total_facets = result.remaining_facets;
+                const kpiF = document.getElementById('kpi-facets');
+                if (kpiF) kpiF.textContent = result.remaining_facets.toLocaleString();
+            }
+        } else {
+            showToast(`⚠️ เกิดข้อผิดพลาด: ${result.error || 'Unknown error'}`);
+        }
+    } catch (err) {
+        console.error('Delete building error:', err);
+        showToast(`⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์`);
     }
 };
 
@@ -574,7 +621,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         minZoom: 12,
         maxZoom: 21,
         pitch: 25,
-        bearing: 0
+        bearing: 0,
+        transformRequest: (url, resourceType) => {
+            if (resourceType === 'Source' && (url.includes('.geojson') || url.includes('.json'))) {
+                const sep = url.includes('?') ? '&' : '?';
+                return { url: url + sep + '_nc=' + Date.now() };
+            }
+        }
     });
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');
@@ -625,10 +678,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
+        const buster = '?t=' + Date.now();
+
         // 3. Add Buildings Layer (4,420 features)
         map.addSource('denchai-buildings', {
             type: 'geojson',
-            data: basePath + 'data/denchai_buildings.geojson',
+            data: basePath + 'data/denchai_buildings.geojson' + buster,
             promoteId: 'id'
         });
 
@@ -677,7 +732,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 4. Add Rooftop Solar Facets Layer (16,573 features)
         map.addSource('solar-facets', {
             type: 'geojson',
-            data: basePath + 'data/denchai_solar_facets.geojson',
+            data: basePath + 'data/denchai_solar_facets.geojson' + buster,
             promoteId: 'id'
         });
 
@@ -968,13 +1023,24 @@ function showInspectorPopup(props, type, lngLat) {
             </div>
 
             <!-- Section 6: False Positive / Road Deletion Action -->
-            ${!isBuilding ? `
-            <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15); display: flex; justify-content: flex-end;">
-                <button onclick="window.deleteFacet('${props.id}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 5px 12px; border-radius: 6px; font-size: 0.72rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.4)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'" title="ลบระนาบนี้ออกจากระบบหากตรวจพบว่าเป็นถนน หรือพื้นดินที่แปลผลคลาดเคลื่อน">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                    <span>🗑️ ลบ Facet นี้ (ไม่ใช่หลังคา / ถนน)</span>
+            <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15); display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
+                ${!isBuilding ? `
+                <button onclick="window.deleteFacet('${props.id}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 5px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.4)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'" title="ลบเฉพาะระนาบนี้ออกจากระบบ">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    <span>🗑️ ลบ Facet นี้</span>
                 </button>
-            </div>` : ''}
+                ${props.building_id ? `
+                <button onclick="window.deleteBuilding('${props.building_id}')" style="background: rgba(234, 88, 12, 0.2); border: 1px solid rgba(234, 88, 12, 0.5); color: #fdba74; padding: 5px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;" onmouseover="this.style.background='rgba(234, 88, 12, 0.4)'" onmouseout="this.style.background='rgba(234, 88, 12, 0.2)'" title="ลบอาคาร ${props.building_id} ทั้งหลังรวมทุก Facet">
+                    <span>🏢 ลบอาคารนี้ทั้งหลัง</span>
+                </button>
+                ` : ''}
+                ` : `
+                <button onclick="window.deleteBuilding('${props.building_id || props.id}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 5px 12px; border-radius: 6px; font-size: 0.72rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.4)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'" title="ลบอาคารนี้และระนาบทั้งหมดออกจากระบบ">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    <span>🗑️ ลบอาคารนี้ (ไม่ใช่หลังคา / ถนน)</span>
+                </button>
+                `}
+            </div>
         </div>
     `;
 
