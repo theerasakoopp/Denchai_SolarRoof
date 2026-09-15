@@ -56,7 +56,7 @@ class WebGISHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/api/git_status':
             try:
-                res = subprocess.run([GIT_PATH, 'status', '--porcelain'], cwd=BASE_DIR, capture_output=True, text=True)
+                res = subprocess.run([GIT_PATH, 'status', '--porcelain'], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace')
                 lines = [line.strip() for line in res.stdout.strip().split('\n') if line.strip()]
                 return self.send_json(200, {
                     'has_changes': len(lines) > 0,
@@ -280,13 +280,16 @@ class WebGISHandler(http.server.SimpleHTTPRequestHandler):
             commit_msg = req.get('message') or f"QA Update: Cleaned rooftop facets and false positives ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})"
 
             try:
+                git_env = os.environ.copy()
+                git_env['PYTHONIOENCODING'] = 'utf-8'
+
                 # 1. git add -A
-                add_res = subprocess.run([GIT_PATH, 'add', '-A'], cwd=BASE_DIR, capture_output=True, text=True)
+                add_res = subprocess.run([GIT_PATH, 'add', '-A'], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace', env=git_env)
                 if add_res.returncode != 0:
                     return self.send_json(500, {'success': False, 'error': add_res.stderr or 'git add failed'})
 
                 # Check if there is anything to commit
-                status_res = subprocess.run([GIT_PATH, 'status', '--porcelain'], cwd=BASE_DIR, capture_output=True, text=True)
+                status_res = subprocess.run([GIT_PATH, 'status', '--porcelain'], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace', env=git_env)
                 if not status_res.stdout.strip():
                     return self.send_json(200, {
                         'success': True,
@@ -295,17 +298,17 @@ class WebGISHandler(http.server.SimpleHTTPRequestHandler):
                     })
 
                 # 2. git commit -m
-                commit_res = subprocess.run([GIT_PATH, 'commit', '-m', commit_msg], cwd=BASE_DIR, capture_output=True, text=True)
+                commit_res = subprocess.run([GIT_PATH, 'commit', '-m', commit_msg], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace', env=git_env)
                 if commit_res.returncode != 0:
                     return self.send_json(500, {'success': False, 'error': commit_res.stderr or 'git commit failed'})
 
                 # 3. git push origin main
-                push_res = subprocess.run([GIT_PATH, 'push', 'origin', 'main'], cwd=BASE_DIR, capture_output=True, text=True)
+                push_res = subprocess.run([GIT_PATH, 'push', 'origin', 'main'], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace', env=git_env)
                 if push_res.returncode != 0:
                     return self.send_json(500, {'success': False, 'error': push_res.stderr or 'git push failed'})
 
                 # Get short commit hash
-                hash_res = subprocess.run([GIT_PATH, 'rev-parse', '--short', 'HEAD'], cwd=BASE_DIR, capture_output=True, text=True)
+                hash_res = subprocess.run([GIT_PATH, 'rev-parse', '--short', 'HEAD'], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace', env=git_env)
                 commit_hash = hash_res.stdout.strip()
 
                 print(f"[GIT SYNC] Successfully committed & pushed ({commit_hash}): {commit_msg}", flush=True)
