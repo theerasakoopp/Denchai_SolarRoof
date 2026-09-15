@@ -4,6 +4,9 @@ import os
 import json
 import shutil
 
+import subprocess
+from datetime import datetime
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 FACETS_PATH = os.path.join(DATA_DIR, 'denchai_solar_facets.geojson')
@@ -12,6 +15,10 @@ STATS_PATH = os.path.join(DATA_DIR, 'denchai_stats.json')
 
 BUILDINGS_PATH = os.path.join(DATA_DIR, 'denchai_buildings.geojson')
 BUILDINGS_BACKUP_PATH = os.path.join(DATA_DIR, 'denchai_buildings_backup.geojson')
+
+GIT_PATH = r"C:\Users\theerasak\AppData\Local\GitHubDesktop\app-3.6.5\resources\app\git\cmd\git.exe"
+if not os.path.exists(GIT_PATH):
+    GIT_PATH = "git"
 
 # Create initial backups if not already present
 if os.path.exists(FACETS_PATH) and not os.path.exists(BACKUP_PATH):
@@ -45,6 +52,21 @@ class WebGISHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Connection', 'close')
         self.end_headers()
         self.wfile.write(resp_bytes)
+
+    def do_GET(self):
+        if self.path == '/api/git_status':
+            try:
+                res = subprocess.run([GIT_PATH, 'status', '--porcelain'], cwd=BASE_DIR, capture_output=True, text=True)
+                lines = [line.strip() for line in res.stdout.strip().split('\n') if line.strip()]
+                return self.send_json(200, {
+                    'has_changes': len(lines) > 0,
+                    'changes_count': len(lines),
+                    'files': lines
+                })
+            except Exception as e:
+                return self.send_json(500, {'error': str(e)})
+        else:
+            return super().do_GET()
 
     def do_POST(self):
         if self.path == '/api/delete_facet':
@@ -246,6 +268,58 @@ class WebGISHandler(http.server.SimpleHTTPRequestHandler):
                 shutil.copy2(BUILDINGS_BACKUP_PATH, BUILDINGS_PATH)
             print("[RESTORE] Restored all facets and buildings from backup", flush=True)
             return self.send_json(200, {'success': True, 'message': 'Restored all facets and buildings from backup'})
+
+        elif self.path == '/api/git_sync':
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8') if content_length > 0 else '{}'
+            try:
+                req = json.loads(body)
+            except Exception:
+                req = {}
+            
+            commit_msg = req.get('message') or f"QA Update: Cleaned rooftop facets and false positives ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})"
+
+            try:
+                # 1. git add -A
+                add_res = subprocess.run([GIT_PATH, 'add', '-A'], cwd=BASE_DIR, capture_output=True, text=True)
+                if add_res.returncode != 0:
+                    return self.send_json(500, {'success': False, 'error': add_res.stderr or 'git add failed'})
+
+                # Check if there is anything to commit
+                status_res = subprocess.run([GIT_PATH, 'status', '--porcelain'], cwd=BASE_DIR, capture_output=True, text=True)
+                if not status_res.stdout.strip():
+                    return self.send_json(200, {
+                        'success': True,
+                        'message': 'ข้อมูลเป็นปัจจุบันแล้ว ไม่มีรายการเปลี่ยนแปลงใหม่ที่ต้องบันทึก',
+                        'already_up_to_date': True
+                    })
+
+                # 2. git commit -m
+                commit_res = subprocess.run([GIT_PATH, 'commit', '-m', commit_msg], cwd=BASE_DIR, capture_output=True, text=True)
+                if commit_res.returncode != 0:
+                    return self.send_json(500, {'success': False, 'error': commit_res.stderr or 'git commit failed'})
+
+                # 3. git push origin main
+                push_res = subprocess.run([GIT_PATH, 'push', 'origin', 'main'], cwd=BASE_DIR, capture_output=True, text=True)
+                if push_res.returncode != 0:
+                    return self.send_json(500, {'success': False, 'error': push_res.stderr or 'git push failed'})
+
+                # Get short commit hash
+                hash_res = subprocess.run([GIT_PATH, 'rev-parse', '--short', 'HEAD'], cwd=BASE_DIR, capture_output=True, text=True)
+                commit_hash = hash_res.stdout.strip()
+
+                print(f"[GIT SYNC] Successfully committed & pushed ({commit_hash}): {commit_msg}", flush=True)
+
+                return self.send_json(200, {
+                    'success': True,
+                    'commit_hash': commit_hash,
+                    'message': f'บันทึกและส่งขึ้น GitHub สำเร็จ (Commit: {commit_hash})',
+                    'repo_url': 'https://github.com/theerasakoopp/Denchai_SolarRoof',
+                    'commit_url': f'https://github.com/theerasakoopp/Denchai_SolarRoof/commit/{commit_hash}'
+                })
+            except Exception as e:
+                print(f"[GIT SYNC ERROR]: {e}", flush=True)
+                return self.send_json(500, {'success': False, 'error': str(e)})
 
         else:
             self.send_response(404)

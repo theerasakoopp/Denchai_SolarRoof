@@ -22,8 +22,204 @@ let popup = null;
 let isMapLoaded = false;
 const pendingActions = [];
 const deletedFacetIds = new Set();
+let isEditMode = false;
+let pendingChangesCount = 0;
 
 // ── Top-Level Window API (Defined immediately to guarantee zero inline onclick errors) ──
+
+window.toggleEditMode = function() {
+    isEditMode = !isEditMode;
+    const btn = document.getElementById('btn-edit-mode');
+    const toolbar = document.getElementById('qa-edit-toolbar');
+
+    if (btn) {
+        btn.classList.toggle('btn-edit-active', isEditMode);
+    }
+    if (toolbar) {
+        toolbar.style.display = isEditMode ? 'flex' : 'none';
+    }
+
+    if (isEditMode) {
+        showToast('✏️ <b>เปิดโหมดแก้ไข (Edit Mode) เรียบร้อย</b><br>คลิกเลือกที่ระนาบหรืออาคารที่ต้องการตรวจสอบเพื่อกดลบสิ่งแปลปลอม (เช่น ถนน หรือพื้นดิน)');
+        window.updateGitStatusBadge();
+    } else {
+        showToast('✅ <b>ปิดโหมดแก้ไข</b> กลับสู่โหมดวิเคราะห์และสำรวจทั่วไป');
+    }
+
+    // Refresh active popup if open
+    if (lastPopupInfo && popup && popup.isOpen()) {
+        showInspectorPopup(lastPopupInfo.props, lastPopupInfo.type, lastPopupInfo.lngLat);
+    }
+};
+
+window.updateGitStatusBadge = async function() {
+    try {
+        const res = await fetch('/api/git_status');
+        const data = await res.json();
+        const badge = document.getElementById('edit-pending-badge');
+        if (!badge) return;
+
+        if (data.has_changes && data.changes_count > 0) {
+            pendingChangesCount = data.changes_count;
+            badge.textContent = `${pendingChangesCount} รายการเปลี่ยนแปลง`;
+            badge.className = 'pending-badge has-changes';
+        } else {
+            pendingChangesCount = 0;
+            badge.textContent = 'ข้อมูลตรงกับ GitHub (Synced)';
+            badge.className = 'pending-badge synced';
+        }
+    } catch (e) {
+        const badge = document.getElementById('edit-pending-badge');
+        if (badge) {
+            badge.textContent = `${pendingChangesCount} รายการเปลี่ยนแปลง`;
+        }
+    }
+};
+
+window.openGitSyncModal = function() {
+    const modal = document.getElementById('git-sync-modal');
+    if (!modal) return;
+    const input = document.getElementById('git-commit-msg');
+    const status = document.getElementById('git-sync-status');
+    const confirmBtn = document.getElementById('btn-confirm-git-push');
+
+    if (status) {
+        status.style.display = 'none';
+        status.innerHTML = '';
+    }
+    if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = `
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+            <span>🚀 ยืนยัน Push ขึ้น GitHub</span>
+        `;
+        confirmBtn.onclick = window.executeGitSync;
+    }
+    if (input) {
+        const nowStr = new Date().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+        input.value = `QA Data Cleaning: ปรับปรุงระนาบหลังคาและลบสิ่งแปลปลอม (${nowStr})`;
+    }
+    modal.style.display = 'flex';
+};
+
+window.closeGitSyncModal = function() {
+    const modal = document.getElementById('git-sync-modal');
+    if (modal) modal.style.display = 'none';
+};
+
+window.executeGitSync = async function() {
+    const input = document.getElementById('git-commit-msg');
+    const status = document.getElementById('git-sync-status');
+    const confirmBtn = document.getElementById('btn-confirm-git-push');
+    const msg = (input && input.value.trim()) ? input.value.trim() : 'QA Data Cleaning: Rooftop facets and buildings cleaned';
+
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '⏳ กำลังบันทึก (Git Commit & Push)...';
+    }
+    if (status) {
+        status.style.display = 'block';
+        status.style.background = 'rgba(56, 189, 248, 0.15)';
+        status.style.border = '1px solid rgba(56, 189, 248, 0.4)';
+        status.style.color = '#38bdf8';
+        status.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="display: inline-block; width: 14px; height: 14px; border: 2px solid #38bdf8; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
+                <span>กำลังประมวลผล <code>git add -A</code>, <code>git commit</code> และ <code>git push origin main</code> ขึ้น GitHub...</span>
+            </div>
+            <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+        `;
+    }
+
+    try {
+        const res = await fetch('/api/git_sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: msg })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            if (status) {
+                status.style.background = 'rgba(16, 185, 129, 0.15)';
+                status.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+                status.style.color = '#34d399';
+                status.innerHTML = `
+                    <div style="font-weight: 700; margin-bottom: 5px; font-size: 0.88rem;">✅ บันทึกและ Push ขึ้น GitHub สำเร็จเรียบร้อยแล้ว!</div>
+                    <div style="font-size: 0.78rem; color: #cbd5e1; margin-bottom: 8px;">${data.message}</div>
+                    ${data.commit_url ? `
+                        <div>
+                            <a href="${data.commit_url}" target="_blank" style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.5); color: #38bdf8; padding: 4px 10px; border-radius: 6px; text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem;">
+                                <span>🔗 ตรวจสอบการเปลี่ยนแปลงบน GitHub</span>
+                                <span style="font-family: 'JetBrains Mono';">[${data.commit_hash}]</span>
+                            </a>
+                        </div>
+                    ` : ''}
+                `;
+            }
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'เสร็จสิ้น (ปิดหน้าต่าง)';
+                confirmBtn.onclick = window.closeGitSyncModal;
+            }
+            pendingChangesCount = 0;
+            window.updateGitStatusBadge();
+            showToast(`🚀 ซิงค์ข้อมูลขึ้น GitHub สำเร็จ! (Commit: ${data.commit_hash || 'Updated'})`);
+        } else {
+            if (status) {
+                status.style.background = 'rgba(239, 68, 68, 0.15)';
+                status.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+                status.style.color = '#fca5a5';
+                status.innerHTML = `❌ เกิดข้อผิดพลาดในการบันทึกหรือ Push: ${data.error || 'Push failed'}`;
+            }
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = 'ลองใหม่อีกครั้ง';
+            }
+        }
+    } catch (err) {
+        console.error('Git sync error:', err);
+        if (status) {
+            status.style.background = 'rgba(239, 68, 68, 0.15)';
+            status.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+            status.style.color = '#fca5a5';
+            status.innerHTML = `❌ ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์: ${err.message}`;
+        }
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = 'ลองใหม่อีกครั้ง';
+        }
+    }
+};
+
+window.restoreAllData = async function() {
+    if (!confirm('คำเตือน: คุณต้องการกู้คืนข้อมูลระนาบหลังคาและอาคารทั้งหมดกลับไปเป็นค่าเริ่มต้นจากไฟล์ Backup ใช่หรือไม่?\n(การลบทั้งหมดจะถูกยกเลิก)')) {
+        return;
+    }
+    try {
+        showToast('⏳ กำลังกู้คืนข้อมูลจาก Backup...');
+        const res = await fetch('/api/restore_all', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            showToast('✅ กู้คืนข้อมูลต้นฉบับสำเร็จเรียบร้อยแล้ว!');
+            deletedFacetIds.clear();
+            const buster = '?t=' + Date.now();
+            if (map && map.getSource('solar-facets')) {
+                map.getSource('solar-facets').setData(basePath + 'data/denchai_solar_facets.geojson' + buster);
+            }
+            if (map && map.getSource('denchai-buildings')) {
+                map.getSource('denchai-buildings').setData(basePath + 'data/denchai_buildings.geojson' + buster);
+            }
+            window.updateGitStatusBadge();
+            setTimeout(() => window.location.reload(), 1200);
+        } else {
+            showToast(`⚠️ กู้คืนไม่สำเร็จ: ${data.error || 'Unknown error'}`);
+        }
+    } catch (e) {
+        console.error('Restore error:', e);
+        showToast('⚠️ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อกู้คืนข้อมูลได้');
+    }
+};
 
 window.deleteFacet = async function(facetId) {
     if (!facetId) return;
@@ -44,7 +240,7 @@ window.deleteFacet = async function(facetId) {
         });
         const result = await res.json();
         if (result.success) {
-            showToast(`💾 บันทึกอัตโนมัติสำเร็จ! ตัดระนาบ [${facetId}] ออกจาก denchai_solar_facets.geojson เรียบร้อยแล้ว (คงเหลือ ${result.remaining_facets.toLocaleString()} ระนาบ)`);
+            showToast(`💾 บันทึกสำเร็จ! ตัดระนาบ [${facetId}] เรียบร้อยแล้ว (คงเหลือ ${result.remaining_facets.toLocaleString()} ระนาบ) — กดปุ่ม 🚀 ซิงค์ขึ้น GitHub ด้านบนเพื่ออัปเดต repository`);
             if (denchaiStats) {
                 denchaiStats.total_facets = result.remaining_facets;
                 const kpiF = document.getElementById('kpi-facets');
@@ -58,6 +254,8 @@ window.deleteFacet = async function(facetId) {
             if (map && map.getSource('denchai-buildings')) {
                 map.getSource('denchai-buildings').setData(basePath + 'data/denchai_buildings.geojson' + buster);
             }
+            pendingChangesCount++;
+            window.updateGitStatusBadge();
         } else {
             showToast(`⚠️ เกิดข้อผิดพลาดในการบันทึก: ${result.error || 'Unknown error'}`);
         }
@@ -83,7 +281,7 @@ window.deleteBuilding = async function(bldId) {
         });
         const result = await res.json();
         if (result.success) {
-            showToast(`💾 บันทึกสำเร็จ! ลบอาคาร [${bldId}] (รวม ${result.deleted_facet_count} ระนาบ) ออกจากฐานข้อมูลเรียบร้อยแล้ว`);
+            showToast(`💾 บันทึกสำเร็จ! ลบอาคาร [${bldId}] (รวม ${result.deleted_facet_count} ระนาบ) เรียบร้อยแล้ว — กดปุ่ม 🚀 ซิงค์ขึ้น GitHub ด้านบนเพื่ออัปเดต`);
             // Force reload MapLibre sources
             const buster = '?t=' + Date.now();
             if (map && map.getSource('solar-facets')) {
@@ -97,6 +295,8 @@ window.deleteBuilding = async function(bldId) {
                 const kpiF = document.getElementById('kpi-facets');
                 if (kpiF) kpiF.textContent = result.remaining_facets.toLocaleString();
             }
+            pendingChangesCount++;
+            window.updateGitStatusBadge();
         } else {
             showToast(`⚠️ เกิดข้อผิดพลาด: ${result.error || 'Unknown error'}`);
         }
@@ -1037,25 +1237,32 @@ function showInspectorPopup(props, type, lngLat) {
                 🌱 ลดการปล่อยก๊าซเรือนกระจก: <b>${co2_ton} tCO₂e/ปี</b>
             </div>
 
-            <!-- Section 6: False Positive / Road Deletion Action -->
-            <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15); display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
-                ${!isBuilding ? `
-                <button onclick="window.deleteFacet('${props.id}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 5px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.4)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'" title="ลบเฉพาะระนาบนี้ออกจากระบบ">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                    <span>🗑️ ลบ Facet นี้</span>
-                </button>
-                ${props.building_id ? `
-                <button onclick="window.deleteBuilding('${props.building_id}')" style="background: rgba(234, 88, 12, 0.2); border: 1px solid rgba(234, 88, 12, 0.5); color: #fdba74; padding: 5px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;" onmouseover="this.style.background='rgba(234, 88, 12, 0.4)'" onmouseout="this.style.background='rgba(234, 88, 12, 0.2)'" title="ลบอาคาร ${props.building_id} ทั้งหลังรวมทุก Facet">
-                    <span>🏢 ลบอาคารนี้ทั้งหลัง</span>
-                </button>
-                ` : ''}
-                ` : `
-                <button onclick="window.deleteBuilding('${props.building_id || props.id}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 5px 12px; border-radius: 6px; font-size: 0.72rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.4)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'" title="ลบอาคารนี้และระนาบทั้งหมดออกจากระบบ">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                    <span>🗑️ ลบอาคารนี้ (ไม่ใช่หลังคา / ถนน)</span>
-                </button>
-                `}
+            <!-- Section 6: False Positive / Road Deletion Action (Conditional on isEditMode) -->
+            ${isEditMode ? `
+            <div style="margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: rgba(245, 158, 11, 0.08); border: 1px dashed rgba(245, 158, 11, 0.4);">
+                <div style="font-size: 0.68rem; font-weight: 700; color: #fbbf24; margin-bottom: 6px; display: flex; align-items: center; gap: 5px;">
+                    <span>🛠️ โหมดแก้ไข: ตรวจพบสิ่งแปลปลอม (False Positive)</span>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
+                    ${!isBuilding ? `
+                    <button onclick="window.deleteFacet('${props.id}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 5px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.4)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'" title="ลบเฉพาะระนาบนี้ออกจากระบบ">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        <span>🗑️ ลบ Facet นี้ (ไม่ใช่หลังคา/ถนน)</span>
+                    </button>
+                    ${props.building_id ? `
+                    <button onclick="window.deleteBuilding('${props.building_id}')" style="background: rgba(234, 88, 12, 0.2); border: 1px solid rgba(234, 88, 12, 0.5); color: #fdba74; padding: 5px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;" onmouseover="this.style.background='rgba(234, 88, 12, 0.4)'" onmouseout="this.style.background='rgba(234, 88, 12, 0.2)'" title="ลบอาคาร ${props.building_id} ทั้งหลังรวมทุก Facet">
+                        <span>🏢 ลบอาคารนี้ทั้งหลัง</span>
+                    </button>
+                    ` : ''}
+                    ` : `
+                    <button onclick="window.deleteBuilding('${props.building_id || props.id}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 5px 12px; border-radius: 6px; font-size: 0.72rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.4)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'" title="ลบอาคารนี้และระนาบทั้งหมดออกจากระบบ">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        <span>🗑️ ลบอาคารนี้ (ไม่ใช่หลังคา / ถนน)</span>
+                    </button>
+                    `}
+                </div>
             </div>
+            ` : ''}
         </div>
     `;
 

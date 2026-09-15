@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+*.tmp
+*backup*.geojson
+.DS_Store
+Thumbs.db
