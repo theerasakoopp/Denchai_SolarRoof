@@ -37,16 +37,16 @@
                 <span style="font-size: 0.65rem; color: #38bdf8;">Digital Twin</span>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px;">
-                <button id="btn-3d-sub-bld" class="control-btn" style="padding: 6px 6px; font-size: 0.7rem; justify-content: center;" onclick="window.set3DSubMode('buildings')">
-                    🏢 อาคารรวม
+                <button id="btn-3d-sub-facet" class="control-btn active" style="padding: 6px 6px; font-size: 0.7rem; justify-content: center;" onclick="window.set3DSubMode('facets')">
+                    🧩 ระนาบ 3D บนภาพ UAV
                 </button>
-                <button id="btn-3d-sub-facet" class="control-btn" style="padding: 6px 6px; font-size: 0.7rem; justify-content: center;" onclick="window.set3DSubMode('facets')">
-                    🧩 แยก Facet
+                <button id="btn-3d-sub-comb" class="control-btn" style="padding: 6px 6px; font-size: 0.7rem; justify-content: center;" onclick="window.set3DSubMode('combined')">
+                    ✨ ผสมผสาน (ผนัง+ระนาบ)
                 </button>
             </div>
             <div style="display: grid; grid-template-columns: 1fr; gap: 6px; margin-bottom: 8px;">
-                <button id="btn-3d-sub-comb" class="control-btn active" style="padding: 6px 6px; font-size: 0.7rem; justify-content: center;" onclick="window.set3DSubMode('combined')">
-                    ✨ ผสมผสาน (อาคาร + ระนาบ)
+                <button id="btn-3d-sub-bld" class="control-btn" style="padding: 6px 6px; font-size: 0.7rem; justify-content: center;" onclick="window.set3DSubMode('buildings')">
+                    🏢 อาคารรวม 3D
                 </button>
             </div>
             <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; display: flex; align-items: center; justify-content: space-between;">

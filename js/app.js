@@ -8,7 +8,7 @@ let map = null;
 let denchaiStats = null;
 let currentMode = 'facets'; // 'facets', 'buildings', 'overview'
 let is3DMode = false;
-let current3DSubMode = 'combined'; // 'facets', 'buildings', 'combined'
+let current3DSubMode = 'facets'; // 'facets' (anchored on UAV), 'combined', 'buildings'
 let currentFacetColorMode = 'orient'; // 'tier', 'orient'
 const activeTiers = new Set(['Tier 3', 'Tier 2', 'Tier 1', 'Sub-optimal']);
 let currentTariff = 4.50; // THB / kWh
@@ -191,6 +191,12 @@ window.toggle3DCity = function() {
             map.setLayoutProperty('layer-buildings-line', 'visibility', 'visible');
         }
 
+        // Ensure UAV Orthophoto is 100% visible and fully opaque in 3D mode
+        if (map.getLayer('layer-uav-10cm')) {
+            map.setLayoutProperty('layer-uav-10cm', 'visibility', 'visible');
+            map.setPaintProperty('layer-uav-10cm', 'raster-opacity', 1.0);
+        }
+
         map.easeTo({
             pitch: 58,
             bearing: -25,
@@ -248,15 +254,22 @@ window.set3DSubMode = function(subMode) {
             map.setLayoutProperty('layer-facets-3d', 'visibility', 'none');
         }
     } else if (subMode === 'facets') {
-        // Separate 3D Roof Facets (elevated at real roof base height!)
+        // Separate 3D Roof Facets directly anchored on UAV Orthophoto (Base = 0 to roof height)
         if (map.getLayer('layer-buildings-3d')) {
             map.setLayoutProperty('layer-buildings-3d', 'visibility', 'none');
         }
         if (map.getLayer('layer-facets-3d')) {
             map.setLayoutProperty('layer-facets-3d', 'visibility', 'visible');
-            map.setPaintProperty('layer-facets-3d', 'fill-extrusion-base', ['coalesce', ['get', 'height_base'], ['get', 'height_eave'], 3.5]);
-            map.setPaintProperty('layer-facets-3d', 'fill-extrusion-height', ['coalesce', ['get', 'height_roof'], ['get', 'height_ridge'], 5.5]);
-            map.setPaintProperty('layer-facets-3d', 'fill-extrusion-opacity', 0.95);
+            // Grounded directly on UAV image at Z = 0
+            map.setPaintProperty('layer-facets-3d', 'fill-extrusion-base', 0);
+            map.setPaintProperty('layer-facets-3d', 'fill-extrusion-height', [
+                'coalesce',
+                ['get', 'height_roof'],
+                ['get', 'height_ridge'],
+                ['get', 'height_mean'],
+                5.0
+            ]);
+            map.setPaintProperty('layer-facets-3d', 'fill-extrusion-opacity', 0.88);
             applyFacet3DColors();
         }
     } else if (subMode === 'combined') {
@@ -275,6 +288,12 @@ window.set3DSubMode = function(subMode) {
             map.setPaintProperty('layer-facets-3d', 'fill-extrusion-opacity', 0.98);
             applyFacet3DColors();
         }
+    }
+
+    // Always ensure UAV Orthophoto is visible under 3D models with high clarity
+    if (map.getLayer('layer-uav-10cm')) {
+        map.setLayoutProperty('layer-uav-10cm', 'visibility', 'visible');
+        map.setPaintProperty('layer-uav-10cm', 'raster-opacity', 1.0);
     }
 };
 
@@ -821,15 +840,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     'coalesce',
                     ['get', 'height_roof'],
                     ['get', 'height_ridge'],
-                    5.5
+                    ['get', 'height_mean'],
+                    5.0
                 ],
-                'fill-extrusion-base': [
-                    'coalesce',
-                    ['get', 'height_base'],
-                    ['get', 'height_eave'],
-                    3.2
-                ],
-                'fill-extrusion-opacity': 0.95
+                'fill-extrusion-base': 0,
+                'fill-extrusion-opacity': 0.88
             }
         });
 
