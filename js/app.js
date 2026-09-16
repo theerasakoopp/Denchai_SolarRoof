@@ -1064,6 +1064,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!is3DMode) window.toggle3DCity();
             }, 600);
         }
+
+        // Auto-activate Edit Mode if requested via URL (?edit=1 or #edit)
+        if (urlParams.get('edit') === '1' || window.location.hash === '#edit') {
+            setTimeout(() => {
+                if (!isEditMode) window.toggleEditMode();
+            }, 700);
+        }
+
+        // Auto-open Git Sync Modal if requested via URL (?gitsync=1)
+        if (urlParams.get('gitsync') === '1') {
+            setTimeout(() => {
+                if (!isEditMode) window.toggleEditMode();
+                window.openGitSyncModal();
+            }, 900);
+        }
     });
 });
 

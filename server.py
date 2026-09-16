@@ -16,9 +16,16 @@ STATS_PATH = os.path.join(DATA_DIR, 'denchai_stats.json')
 BUILDINGS_PATH = os.path.join(DATA_DIR, 'denchai_buildings.geojson')
 BUILDINGS_BACKUP_PATH = os.path.join(DATA_DIR, 'denchai_buildings_backup.geojson')
 
-GIT_PATH = r"C:\Users\theerasak\AppData\Local\GitHubDesktop\app-3.6.5\resources\app\git\cmd\git.exe"
-if not os.path.exists(GIT_PATH):
+import glob
+
+git_candidates = sorted(glob.glob(r"C:\Users\theerasak\AppData\Local\GitHubDesktop\app-*\resources\app\git\cmd\git.exe"))
+if git_candidates:
+    GIT_PATH = git_candidates[-1]
+elif shutil.which("git"):
+    GIT_PATH = shutil.which("git")
+else:
     GIT_PATH = "git"
+print(f"[GIT] Using Git executable at: {GIT_PATH}")
 
 # Create initial backups if not already present
 if os.path.exists(FACETS_PATH) and not os.path.exists(BACKUP_PATH):
