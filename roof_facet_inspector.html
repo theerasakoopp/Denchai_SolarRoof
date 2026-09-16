@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive 3D Roof Typology & Facet Inspector | Den Chai SolarRoof</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Three.js & OrbitControls -->
+  <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #080c16;
+      color: #f1f5f9;
+      font-family: 'Inter', -apple-system, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #canvas-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* Top Navigation Bar */
+    .top-nav {
+      position: absolute;
+      top: 16px;
+      left: 20px;
+      right: 20px;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .nav-brand {
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 12px 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-sub {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-top: 3px;
+    }
+    .badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: rgba(14, 165, 233, 0.2);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+    }
+
+    .nav-links {
+      pointer-events: auto;
+      display: flex;
+      gap: 10px;
+    }
+    .nav-btn {
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #cbd5e1;
+      padding: 9px 16px;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    }
+    .nav-btn:hover {
+      background: rgba(30, 41, 59, 0.95);
+      color: #38bdf8;
+      border-color: #38bdf8;
+      transform: translateY(-1px);
+    }
+
+    /* Left Control & 2D Plan Panel */
+    .left-panel {
+      position: absolute;
+      top: 90px;
+      left: 20px;
+      bottom: 24px;
+      width: 380px;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+      overflow-y: auto;
+    }
+
+    .section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Mode Tabs */
+    .tab-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      background: rgba(2, 6, 23, 0.6);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .tab-btn {
+      padding: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: transparent;
+      color: #94a3b8;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: #0284c7;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+    }
+
+    /* Select Dropdown */
+    .custom-select {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 8px;
+      color: #f8fafc;
+      font-size: 0.82rem;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+    .custom-select:focus {
+      border-color: #38bdf8;
+    }
+
+    /* 2D Plan Container */
+    .plan-box {
+      background: #ffffff;
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      border: 2px solid #cbd5e1;
+    }
+    #plan-canvas {
+      width: 100%;
+      height: 150px;
+    }
+    .plan-meta {
+      margin-top: 8px;
+      text-align: center;
+      color: #1e293b;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+    .plan-param {
+      font-family: 'JetBrains Mono', monospace;
+      color: #0369a1;
+      font-size: 0.78rem;
+      margin-top: 2px;
+    }
+
+    /* Controls: Explode Slider & Toggles */
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+    .slider-input {
+      width: 100%;
+      accent-color: #38bdf8;
+      cursor: pointer;
+    }
+
+    .toggle-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .toggle-btn {
+      padding: 7px 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: #cbd5e1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .toggle-btn.active {
+      background: rgba(14, 165, 233, 0.25);
+      border-color: #38bdf8;
+      color: #38bdf8;
+    }
+
+    /* Right Inspection Panel */
+    .right-panel {
+      position: absolute;
+      top: 90px;
+      right: 20px;
+      bottom: 24px;
+      width: 360px;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+      overflow-y: auto;
+    }
+
+    .facet-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+    }
+
+    .facet-item {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .facet-item:hover, .facet-item.selected {
+      border-color: #f59e0b;
+      background: rgba(30, 41, 59, 0.95);
+      box-shadow: 0 4px 16px rgba(245, 158, 11, 0.25);
+    }
+
+    .facet-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .facet-name {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+    .facet-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .facet-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      font-size: 0.72rem;
+      color: #94a3b8;
+    }
+    .stat-em {
+      color: #f1f5f9;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Color Legend Floating */
+    .color-legend {
+      position: absolute;
+      bottom: 24px;
+      left: 420px;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 8px 14px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      font-size: 0.72rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 3D Canvas -->
+  <div id="canvas-container"></div>
+
+  <!-- Top Navigation -->
+  <div class="top-nav">
+    <div class="nav-brand">
+      <div class="brand-title">
+        <span>🏛️ LoD2 Roof Typology & Facet Inspector</span>
+        <span class="badge">GeoAI 3D Digital Twin</span>
+      </div>
+      <div class="brand-sub">ระบบจำลองเรขาคณิตรูปทรงหลังคา 3 มิติ และวิเคราะห์ระนาบ (Discrete Facets) เทศบาลตำบลเด่นชัย</div>
+    </div>
+    <div class="nav-links">
+      <a href="index.html" class="nav-btn">🗺️ กลับสู่แผนที่หลัก (Main WebGIS)</a>
+      <a href="lod2_3d_viewer.html" class="nav-btn" style="border-color:#f59e0b; color:#fbbf24;">🏙️ เมือง 3D (1,323 อาคาร)</a>
+    </div>
+  </div>
+
+  <!-- Left Control Panel -->
+  <div class="left-panel">
+    <div class="section-title">
+      <span>โหมดการแสดงผล (Inspection Mode)</span>
+    </div>
+    <div class="tab-group">
+      <button id="tab-archetype" class="tab-btn active" onclick="switchMode('archetype')">รูปทรงเรขาคณิต (M1–M16)</button>
+      <button id="tab-empirical" class="tab-btn" onclick="switchMode('empirical')">อาคารจริงจากโมเดล</button>
+    </div>
+
+    <!-- Selectors -->
+    <div id="archetype-selector-box">
+      <div class="section-title" style="margin-bottom:6px;">เลือกรูปทรงหลังคา (Roof Typology)</div>
+      <select id="sel-archetype" class="custom-select" onchange="loadArchetype(this.value)">
+        <option value="hip_m6">M6: Hip roof (ทรงปั้นหยา D=3)</option>
+        <option value="gable_m4">M4: Gable roof (ทรงจั่ว D=2)</option>
+        <option value="flat_m1">M1: Flat roof (ทรงแบน D=1)</option>
+        <option value="shed_m2">M2: Shed roof (เพิงหมาแหงน D=2)</option>
+        <option value="pyramidal_m3">M3: Pyramidal roof (ปิรามิด D=2)</option>
+        <option value="saltbox_m12">M12: Saltbox roof (จั่วอสมมาตร D=3)</option>
+        <option value="compound_m16">M16: Compound (จั่ว+ดาดฟ้าแบน D=4)</option>
+      </select>
+    </div>
+
+    <div id="empirical-selector-box" style="display:none;">
+      <div class="section-title" style="margin-bottom:6px;">เลือกอาคารจริงจากโมเดลเด่นชัย</div>
+      <select id="sel-empirical" class="custom-select" onchange="loadEmpirical(this.value)">
+      </select>
+    </div>
+
+    <!-- 2D Plan View (Matching User Diagram) -->
+    <div class="section-title">
+      <span>แปลน 2 มิติ (2D Plan & Wireframe)</span>
+      <span style="font-size:0.65rem; color:#38bdf8;">มุมมองบน Top-Down</span>
+    </div>
+    <div class="plan-box">
+      <svg id="plan-canvas" viewBox="0 0 200 140"></svg>
+      <div id="plan-title" class="plan-meta">(f) Hip roof.</div>
+      <div id="plan-param" class="plan-param">P = (Hg, Hc, α) | D = 3</div>
+    </div>
+
+    <!-- 3D Controls -->
+    <div class="section-title">
+      <span>ควบคุมการจำลอง 3 มิติ</span>
+    </div>
+
+    <div class="control-row">
+      <div class="control-label">
+        <span>🚀 แยกชิ้นส่วนระนาบ (Explode Facets)</span>
+        <span id="lbl-explode" style="color:#38bdf8;">0%</span>
+      </div>
+      <input id="slider-explode" type="range" class="slider-input" min="0" max="100" value="0" oninput="setExplode(this.value)">
+    </div>
+
+    <div class="section-title">
+      <span>โหมดชุดสีระนาบ (Color Mode)</span>
+    </div>
+    <div class="toggle-grid">
+      <button id="btn-col-aspect" class="toggle-btn active" onclick="setColorMode('aspect')">🧭 ทิศทาง (Aspect)</button>
+      <button id="btn-col-solar" class="toggle-btn" onclick="setColorMode('solar')">☀️ ศักยภาพโซลาร์</button>
+      <button id="btn-col-clay" class="toggle-btn" onclick="setColorMode('clay')">🧱 กระเบื้องแดง (Clay)</button>
+      <button id="btn-col-solid" class="toggle-btn" onclick="setColorMode('white')">⚪ ขาว CAD Solid</button>
+    </div>
+
+    <div class="section-title">
+      <span>ตัวเลือกการแสดงผล</span>
+    </div>
+    <div class="toggle-grid">
+      <button id="btn-toggle-ridge" class="toggle-btn active" onclick="toggleRidgeLines()">✨ สันหลังคา (Ridge)</button>
+      <button id="btn-toggle-shadow" class="toggle-btn active" onclick="toggleShadows()">🌤️ เงาตกทอด (Shadow)</button>
+      <button id="btn-toggle-wire" class="toggle-btn" onclick="toggleWireframe()">📐 โครงลวด (Wire)</button>
+      <button id="btn-toggle-rotate" class="toggle-btn" onclick="toggleAutoRotate()">🔄 หมุนอัตโนมัติ</button>
+    </div>
+  </div>
+
+  <!-- Right Inspection Panel -->
+  <div class="right-panel">
+    <div class="section-title">
+      <span>คุณลักษณะอาคาร (Building Metadata)</span>
+      <span id="bldg-id-tag" class="badge">M6</span>
+    </div>
+
+    <div style="background:rgba(2, 6, 23, 0.7); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:10px 12px; font-size:0.78rem;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <span style="color:#94a3b8;">ประเภทรูปทรง:</span>
+        <span id="bldg-roof-type" style="font-weight:700; color:#f8fafc;">Hip roof (ทรงปั้นหยา)</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <span style="color:#94a3b8;">พื้นที่ 3 มิติ:</span>
+        <span id="bldg-area" class="stat-em">150.9 m²</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <span style="color:#94a3b8;">ชายคา (Hg) / สัน (Hc):</span>
+        <span id="bldg-heights" class="stat-em">6.8m / 9.0m</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <span style="color:#94a3b8;">ความชันหลังคา:</span>
+        <span id="bldg-slope" class="stat-em">23.9°</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:#94a3b8;">โซลาร์ประเมิน:</span>
+        <span id="bldg-solar" style="font-weight:700; color:#fbbf24; font-family:'JetBrains Mono';">53,242 kWh/yr</span>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:6px;">
+      <span>ระนาบที่โมเดลสกัดได้ (Discrete Facets)</span>
+      <span id="facet-count-tag" style="color:#38bdf8; font-weight:700;">4 ระนาบ</span>
+    </div>
+
+    <!-- Facet List -->
+    <div id="facet-list-container" class="facet-list">
+    </div>
+  </div>
+
+  <!-- Color Legend -->
+  <div class="color-legend">
+    <span style="color:#94a3b8; font-weight:600;">ทิศทางหลังคา:</span>
+    <div class="legend-item"><div class="legend-dot" style="background:#0284c7;"></div><span>North (Nroof)</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#059669;"></div><span>East (Eroof)</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#d97706;"></div><span>South (Sroof)</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ea580c;"></div><span>West (Wroof)</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#7c3aed;"></div><span>Flat (Froof)</span></div>
+  </div>
+
+  <!-- DATA & APP LOGIC -->
+  <script>
+    // Empirical Buildings Data from Denchai LoD2
+    const EMPIRICAL_DATA = [{"id": "BLD_1", "bldg_id": 1, "code": "BLD_0", "roof_type": "Flat", "area_m2": 486.5, "z_eave": 2.0, "z_ridge": 2.8, "height_m": 2.8, "slope_deg": 0.0, "solar_kwh": 193631.0, "facets": [{"facet_id": 1, "volume": "Single", "name": "Flat Roof Deck", "orientation": "Flat", "aspect_deg": 0.0, "slope_deg": 0.0, "area_3d_m2": 713.94, "annual_yield_kwh": 193631.2, "suitability": "High (Flat Mount)"}], "footprint": [[33.03, 5.43], [33.08, -2.76], [16.08, -2.86], [16.09, -4.18], [12.6, -4.2], [12.59, -3.68], [0.89, -3.74], [0.88, -2.25], [-6.85, -2.29], [-6.88, 3.63], [-13.55, 3.6], [-13.54, 1.46], [-16.77, 1.44], [-16.76, 0.05], [-41.96, -0.09], [-41.99, 5.01], [33.03, 5.43]], "ridge_segs": []}, {"id": "BLD_2", "bldg_id": 2, "code": "BLD_2", "roof_type": "Flat", "area_m2": 50.0, "z_eave": 2.0, "z_ridge": 2.8, "height_m": 2.8, "slope_deg": 0.0, "solar_kwh": 13547.0, "facets": [{"facet_id": 1, "volume": "Single", "name": "Flat Roof Deck", "orientation": "Flat", "aspect_deg": 0.0, "slope_deg": 0.0, "area_3d_m2": 49.95, "annual_yield_kwh": 13547.2, "suitability": "High (Flat Mount)"}], "footprint": [[-2.68, 3.0], [-2.52, -4.63], [4.02, -4.5], [3.86, 3.13], [-2.68, 3.0]], "ridge_segs": []}, {"id": "BLD_3", "bldg_id": 3, "code": "BLD_3", "roof_type": "Hip", "area_m2": 150.9, "z_eave": 6.78, "z_ridge": 9.04, "height_m": 9.04, "slope_deg": 23.9, "solar_kwh": 53243.0, "facets": [{"facet_id": 1, "volume": "Single", "name": "South Facet", "orientation": "South", "aspect_deg": 183.8, "slope_deg": 26.3, "area_3d_m2": 84.14, "annual_yield_kwh": 25273.7, "suitability": "Optimal"}, {"facet_id": 2, "volume": "Single", "name": "North Facet", "orientation": "North", "aspect_deg": 3.8, "slope_deg": 26.3, "area_3d_m2": 84.14, "annual_yield_kwh": 17830.8, "suitability": "Diffuse Only"}, {"facet_id": 3, "volume": "Single", "name": "West Hip Facet", "orientation": "West", "aspect_deg": 273.8, "slope_deg": 31.7, "area_3d_m2": 19.79, "annual_yield_kwh": 5012.4, "suitability": "Moderate (Afternoon)"}, {"facet_id": 4, "volume": "Single", "name": "East Hip Facet", "orientation": "East", "aspect_deg": 93.8, "slope_deg": 31.7, "area_3d_m2": 19.79, "annual_yield_kwh": 5125.9, "suitability": "Moderate (Morning)"}], "footprint": [[-6.32, -4.1], [10.09, -3.01], [9.48, 6.15], [-6.93, 5.06], [-6.32, -4.1]], "ridge_segs": [[[-2687.809, 9.045, 760.292], [-2678.726, 9.045, 759.69]]]}, {"id": "BLD_4", "bldg_id": 4, "code": "BLD_4", "roof_type": "Gable", "area_m2": 888.7, "z_eave": 6.66, "z_ridge": 8.24, "height_m": 8.24, "slope_deg": 12.0, "solar_kwh": 231393.0, "facets": [{"facet_id": 1, "volume": "Single", "name": "West Facet", "orientation": "West", "aspect_deg": 359.6, "slope_deg": 10.3, "area_3d_m2": 451.68, "annual_yield_kwh": 95348.8, "suitability": "Moderate (Afternoon)"}, {"facet_id": 2, "volume": "Single", "name": "East Facet", "orientation": "East", "aspect_deg": 179.6, "slope_deg": 10.3, "area_3d_m2": 451.68, "annual_yield_kwh": 136044.6, "suitability": "Moderate (Morning)"}], "footprint": [[20.54, 6.81], [-30.7, 7.13], [-30.81, -10.21], [20.43, -10.54], [20.54, 6.81]], "ridge_segs": [[[-2663.308, 8.24, 733.959], [-2714.543, 8.24, 733.635]]]}, {"id": "BLD_7", "bldg_id": 7, "code": "BLD_10", "roof_type": "Gable", "area_m2": 87.8, "z_eave": 4.55, "z_ridge": 5.44, "height_m": 5.44, "slope_deg": 12.0, "solar_kwh": 23366.0, "facets": [{"facet_id": 1, "volume": "Single", "name": "South Facet", "orientation": "South", "aspect_deg": 236.2, "slope_deg": 15.8, "area_3d_m2": 45.61, "annual_yield_kwh": 12829.7, "suitability": "Optimal"}, {"facet_id": 2, "volume": "Single", "name": "North Facet", "orientation": "North", "aspect_deg": 56.2, "slope_deg": 15.8, "area_3d_m2": 45.61, "annual_yield_kwh": 10536.1, "suitability": "Diffuse Only"}], "footprint": [[1.02, 6.04], [6.24, 2.54], [-1.53, -9.06], [-6.75, -5.56], [1.02, 6.04]], "ridge_segs": [[[-2703.304, 5.44, 245.275], [-2695.528, 5.44, 233.671]]]}, {"id": "BLD_9", "bldg_id": 9, "code": "BLD_12", "roof_type": "Hip", "area_m2": 160.2, "z_eave": 4.22, "z_ridge": 5.02, "height_m": 5.02, "slope_deg": 12.0, "solar_kwh": 67828.0, "facets": [{"facet_id": 1, "volume": "Single", "name": "South Facet", "orientation": "South", "aspect_deg": 244.6, "slope_deg": 9.3, "area_3d_m2": 112.92, "annual_yield_kwh": 31102.7, "suitability": "Optimal"}, {"facet_id": 2, "volume": "Single", "name": "North Facet", "orientation": "North", "aspect_deg": 64.6, "slope_deg": 9.3, "area_3d_m2": 112.92, "annual_yield_kwh": 26745.6, "suitability": "Diffuse Only"}, {"facet_id": 3, "volume": "Single", "name": "West Hip Facet", "orientation": "West", "aspect_deg": 334.6, "slope_deg": 11.6, "area_3d_m2": 19.48, "annual_yield_kwh": 4195.7, "suitability": "Moderate (Afternoon)"}, {"facet_id": 4, "volume": "Single", "name": "East Hip Facet", "orientation": "East", "aspect_deg": 154.6, "slope_deg": 11.6, "area_3d_m2": 19.48, "annual_yield_kwh": 5783.8, "suitability": "Moderate (Morning)"}], "footprint": [[-1.81, 6.88], [-0.37, 6.2], [1.29, 9.69], [5.0, 7.93], [3.23, 4.21], [6.91, 2.47], [4.1, -3.45], [2.69, -2.78], [-0.07, -8.59], [-3.37, -7.02], [-5.82, -12.19], [-9.94, -10.23], [-1.81, 6.88]], "ridge_segs": [[[-2690.645, 5.022, 230.017], [-2684.211, 5.022, 216.466]]]}, {"id": "BLD_23", "bldg_id": 23, "code": "BLD_30", "roof_type": "Compound (Gable+Flat)", "area_m2": 429.8, "z_eave": 3.94, "z_ridge": 8.56, "height_m": 8.56, "slope_deg": 21.0, "solar_kwh": 85813.0, "facets": [{"facet_id": 1, "volume": "Veranda", "name": "Flat Roof Deck", "orientation": "Flat", "aspect_deg": 0.0, "slope_deg": 0.0, "area_3d_m2": 24.38, "annual_yield_kwh": 6612.2, "suitability": "High (Flat Mount)"}, {"facet_id": 2, "volume": "MainHouse", "name": "West Facet", "orientation": "West", "aspect_deg": 339.9, "slope_deg": 30.8, "area_3d_m2": 154.6, "annual_yield_kwh": 33285.7, "suitability": "Moderate (Afternoon)"}, {"facet_id": 3, "volume": "MainHouse", "name": "East Facet", "orientation": "East", "aspect_deg": 159.9, "slope_deg": 30.8, "area_3d_m2": 154.6, "annual_yield_kwh": 45915.1, "suitability": "Moderate (Morning)"}], "footprint": [[12.55, 2.01], [-13.49, 11.54], [-18.82, -3.01], [7.22, -12.55], [12.55, 2.01]], "ridge_segs": [[[-2420.47, 8.564, -130.966], [-2436.558, 8.564, -136.859]]]}, {"id": "BLD_34", "bldg_id": 34, "code": "BLD_41", "roof_type": "Compound (Gable+Flat)", "area_m2": 259.4, "z_eave": 4.66, "z_ridge": 7.11, "height_m": 7.11, "slope_deg": 12.7, "solar_kwh": 61251.0, "facets": [{"facet_id": 1, "volume": "Veranda", "name": "Flat Roof Deck", "orientation": "Flat", "aspect_deg": 0.0, "slope_deg": 0.0, "area_3d_m2": 68.21, "annual_yield_kwh": 18499.6, "suitability": "High (Flat Mount)"}, {"facet_id": 2, "volume": "MainHouse", "name": "West Facet", "orientation": "West", "aspect_deg": 301.8, "slope_deg": 36.1, "area_3d_m2": 83.45, "annual_yield_kwh": 19521.0, "suitability": "Moderate (Afternoon)"}, {"facet_id": 3, "volume": "MainHouse", "name": "East Facet", "orientation": "East", "aspect_deg": 121.8, "slope_deg": 36.1, "area_3d_m2": 83.45, "annual_yield_kwh": 23230.0, "suitability": "Moderate (Morning)"}], "footprint": [[-6.33, 7.7], [-2.88, 2.14], [2.45, 5.45], [5.7, 0.22], [3.0, -1.44], [4.24, -3.44], [7.37, -1.49], [10.03, -5.77], [-3.33, -14.07], [-13.92, 2.99], [-6.33, 7.7]], "ridge_segs": [[[-2511.843, 7.105, -226.453], [-2522.428, 7.105, -243.51]]]}];
+
+    // Color Maps
+    const ASPECT_COLORS = {
+      'North': 0x0284c7,
+      'East': 0x059669,
+      'South': 0xd97706,
+      'West': 0xea580c,
+      'Flat': 0x7c3aed
+    };
+
+    // State Variables
+    let currentMode = 'archetype'; // 'archetype' or 'empirical'
+    let currentData = null;
+    let currentColorMode = 'aspect'; // 'aspect', 'solar', 'clay', 'white'
+    let explodeDistance = 0.0;
+    let showRidge = true;
+    let showShadow = true;
+    let showWire = false;
+    let autoRotate = false;
+
+    // Three.js Globals
+    let scene, camera, renderer, controls;
+    let buildingGroup, roofGroup, wallGroup, shadowMesh, ridgeGroup;
+    let facetMeshes = [];
+
+    // Init App
+    window.addEventListener('DOMContentLoaded', () => {
+      initThree();
+      initEmpiricalDropdown();
+
+      const params = new URLSearchParams(window.location.search);
+      const initialMode = params.get('mode') || 'archetype';
+      if (initialMode === 'empirical') {
+        switchMode('empirical');
+        const bldgId = params.get('bldg') || '3';
+        document.getElementById('sel-empirical').value = bldgId;
+        loadEmpirical(bldgId);
+      } else {
+        const archType = params.get('type') || 'hip_m6';
+        document.getElementById('sel-archetype').value = archType;
+        loadArchetype(archType);
+      }
+
+      if (params.get('color')) {
+        setColorMode(params.get('color'));
+      }
+      if (params.get('explode')) {
+        const expVal = parseInt(params.get('explode'), 10);
+        document.getElementById('slider-explode').value = expVal;
+        setExplode(expVal);
+      }
+
+      animate();
+    });
+
+    function initThree() {
+      const container = document.getElementById('canvas-container');
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x080c16);
+      scene.fog = new THREE.FogExp2(0x080c16, 0.015);
+
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(16, 12, 18);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2 + 0.05; // don't go too far under ground
+      controls.target.set(0, 3, 0);
+
+      // Lights
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+      scene.add(ambientLight);
+
+      const sunLight = new THREE.DirectionalLight(0xfff5ea, 1.25);
+      sunLight.position.set(20, 35, 20);
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.width = 2048;
+      sunLight.shadow.mapSize.height = 2048;
+      sunLight.shadow.camera.near = 0.5;
+      sunLight.shadow.camera.far = 100;
+      const d = 25;
+      sunLight.shadow.camera.left = -d;
+      sunLight.shadow.camera.right = d;
+      sunLight.shadow.camera.top = d;
+      sunLight.shadow.camera.bottom = -d;
+      sunLight.shadow.bias = -0.0005;
+      scene.add(sunLight);
+
+      // Ground plane with shadows
+      const groundGeo = new THREE.PlaneGeometry(80, 80);
+      const groundMat = new THREE.ShadowMaterial({ opacity: 0.45 });
+      shadowMesh = new THREE.Mesh(groundGeo, groundMat);
+      shadowMesh.rotation.x = -Math.PI / 2;
+      shadowMesh.position.y = 0;
+      shadowMesh.receiveShadow = true;
+      scene.add(shadowMesh);
+
+      // Floor Grid
+      const grid = new THREE.GridHelper(50, 50, 0x1e293b, 0x0f172a);
+      grid.position.y = -0.01;
+      scene.add(grid);
+
+      // Building container group
+      buildingGroup = new THREE.Group();
+      scene.add(buildingGroup);
+
+      // Raycaster for 3D Facet Click & Hover
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+
+      renderer.domElement.addEventListener('pointermove', (event) => {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(facetMeshes, true);
+        renderer.domElement.style.cursor = intersects.length > 0 ? 'pointer' : 'default';
+      });
+
+      renderer.domElement.addEventListener('click', (event) => {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(facetMeshes, true);
+        if (intersects.length > 0) {
+          const hitMesh = intersects[0].object;
+          const idx = facetMeshes.indexOf(hitMesh);
+          if (idx !== -1) {
+            highlightFacet(idx);
+            const cards = document.querySelectorAll('.facet-item');
+            if (cards[idx]) {
+              cards[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+          }
+        }
+      });
+
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (autoRotate && controls) {
+        buildingGroup.rotation.y += 0.005;
+      }
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // Switch between Archetype and Empirical
+    function switchMode(mode) {
+      currentMode = mode;
+      document.getElementById('tab-archetype').classList.toggle('active', mode === 'archetype');
+      document.getElementById('tab-empirical').classList.toggle('active', mode === 'empirical');
+      document.getElementById('archetype-selector-box').style.display = mode === 'archetype' ? 'block' : 'none';
+      document.getElementById('empirical-selector-box').style.display = mode === 'empirical' ? 'block' : 'none';
+
+      if (mode === 'archetype') {
+        loadArchetype(document.getElementById('sel-archetype').value);
+      } else {
+        loadEmpirical(document.getElementById('sel-empirical').value);
+      }
+    }
+
+    function initEmpiricalDropdown() {
+      const sel = document.getElementById('sel-empirical');
+      sel.innerHTML = '';
+      EMPIRICAL_DATA.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.bldg_id;
+        opt.textContent = `อาคาร #${b.bldg_id} (${b.roof_type}, ${b.area_m2} m², ${b.facets.length} ระนาบ)`;
+        sel.appendChild(opt);
+      });
+    }
+
+    // =========================================================================
+    // PARAMETRIC ARCHETYPES (Matching User Diagram)
+    // =========================================================================
+    const ARCHETYPES = {
+      'hip_m6': {
+        id: 'M6',
+        title: '(f) Hip roof.',
+        param: 'P = (Hg, Hc, α) | D = 3',
+        roof_type: 'Hip roof (ทรงปั้นหยา)',
+        L: 12, W: 8, Hg: 4.5, Hc: 7.5, alpha: 2.8,
+        facets: [
+          { name: 'South Facet', orient: 'South', tilt: 24.5, az: 180, area: 48.2, yield: 15800, tier: 'Optimal' },
+          { name: 'North Facet', orient: 'North', tilt: 24.5, az: 0, area: 48.2, yield: 10500, tier: 'Diffuse Only' },
+          { name: 'West Hip Facet', orient: 'West', tilt: 28.0, az: 270, area: 18.6, yield: 4900, tier: 'Moderate' },
+          { name: 'East Hip Facet', orient: 'East', tilt: 28.0, az: 90, area: 18.6, yield: 5100, tier: 'Moderate' }
+        ],
+        svg: () => renderSvgPlan(12, 8, 'hip', 2.8)
+      },
+      'gable_m4': {
+        id: 'M4',
+        title: '(d) Gable roof.',
+        param: 'P = (Hg, Hc) | D = 2',
+        roof_type: 'Gable roof (ทรงจั่ว)',
+        L: 12, W: 8, Hg: 4.5, Hc: 7.5, alpha: 0,
+        facets: [
+          { name: 'South Facet', orient: 'South', tilt: 26.5, az: 180, area: 53.6, yield: 17400, tier: 'Optimal' },
+          { name: 'North Facet', orient: 'North', tilt: 26.5, az: 0, area: 53.6, yield: 11600, tier: 'Diffuse Only' }
+        ],
+        svg: () => renderSvgPlan(12, 8, 'gable', 0)
+      },
+      'flat_m1': {
+        id: 'M1',
+        title: '(a) Flat roof.',
+        param: 'P = Hg | D = 1',
+        roof_type: 'Flat roof (ทรงแบน / ดาดฟ้า)',
+        L: 10, W: 8, Hg: 5.0, Hc: 5.0, alpha: 0,
+        facets: [
+          { name: 'Flat Roof Deck', orient: 'Flat', tilt: 0.0, az: 0, area: 80.0, yield: 24500, tier: 'High (Flat Mount)' }
+        ],
+        svg: () => renderSvgPlan(10, 8, 'flat', 0)
+      },
+      'shed_m2': {
+        id: 'M2',
+        title: '(b) Shed roof.',
+        param: "P = (Hg, Hg') | D = 2",
+        roof_type: 'Shed roof (เพิงหมาแหงน)',
+        L: 11, W: 8, Hg: 4.0, Hc: 6.8, alpha: 0,
+        facets: [
+          { name: 'Single Sloped Facet', orient: 'South', tilt: 19.3, az: 180, area: 93.2, yield: 29800, tier: 'Optimal' }
+        ],
+        svg: () => renderSvgPlan(11, 8, 'shed', 0)
+      },
+      'pyramidal_m3': {
+        id: 'M3',
+        title: '(c) Pyramidal roof.',
+        param: 'P = (Hg, Hc) | D = 2',
+        roof_type: 'Pyramidal roof (ทรงปิรามิดยอดแหลม)',
+        L: 9, W: 9, Hg: 4.5, Hc: 8.0, alpha: 4.5,
+        facets: [
+          { name: 'South Facet', orient: 'South', tilt: 37.8, az: 180, area: 25.4, yield: 7900, tier: 'Optimal' },
+          { name: 'North Facet', orient: 'North', tilt: 37.8, az: 0, area: 25.4, yield: 4900, tier: 'Diffuse Only' },
+          { name: 'West Facet', orient: 'West', tilt: 37.8, az: 270, area: 25.4, yield: 6400, tier: 'Moderate' },
+          { name: 'East Facet', orient: 'East', tilt: 37.8, az: 90, area: 25.4, yield: 6600, tier: 'Moderate' }
+        ],
+        svg: () => renderSvgPlan(9, 9, 'pyramid', 4.5)
+      },
+      'saltbox_m12': {
+        id: 'M12',
+        title: '(l) Saltbox roof.',
+        param: 'P = (Hg, Hc, β) | D = 3',
+        roof_type: 'Saltbox roof (ทรงจั่วอสมมาตรปีกนก)',
+        L: 12, W: 8, Hg: 4.0, Hc: 7.2, alpha: 0, beta: 2.2,
+        facets: [
+          { name: 'Long South Facet', orient: 'South', tilt: 21.0, az: 180, area: 62.4, yield: 20400, tier: 'Optimal' },
+          { name: 'Short North Facet', orient: 'North', tilt: 42.0, az: 0, area: 38.2, yield: 7200, tier: 'Diffuse Only' }
+        ],
+        svg: () => renderSvgPlan(12, 8, 'saltbox', 2.2)
+      },
+      'compound_m16': {
+        id: 'M16',
+        title: 'Compound Split-Level.',
+        param: 'P = (Hg, Hc, L1, L2) | D = 4',
+        roof_type: 'Compound (จั่วประธาน + กันสาดดาดฟ้า)',
+        L: 14, W: 8, Hg: 4.5, Hc: 7.5, alpha: 0,
+        facets: [
+          { name: 'Main Gabled South', orient: 'South', tilt: 26.5, az: 180, area: 44.6, yield: 14500, tier: 'Optimal' },
+          { name: 'Main Gabled North', orient: 'North', tilt: 26.5, az: 0, area: 44.6, yield: 9600, tier: 'Diffuse Only' },
+          { name: 'Flat Veranda Deck', orient: 'Flat', tilt: 0.0, az: 0, area: 32.0, yield: 9800, tier: 'High (Flat Mount)' }
+        ],
+        svg: () => renderSvgPlan(14, 8, 'compound', 4.0)
+      }
+    };
+
+    function loadArchetype(key) {
+      const arch = ARCHETYPES[key];
+      if (!arch) return;
+      currentData = arch;
+      build3DArchetype(arch);
+      updateMetadataCard(arch);
+      arch.svg();
+    }
+
+    function loadEmpirical(bid) {
+      const bldg = EMPIRICAL_DATA.find(b => b.bldg_id == bid);
+      if (!bldg) return;
+      currentData = bldg;
+      build3DEmpirical(bldg);
+      updateMetadataCard(bldg);
+      renderEmpiricalSvgPlan(bldg);
+    }
+
+    // =========================================================================
+    // 3D MESH BUILDERS
+    // =========================================================================
+    function clearBuilding() {
+      facetMeshes = [];
+      while(buildingGroup.children.length > 0) {
+        const obj = buildingGroup.children[0];
+        buildingGroup.remove(obj);
+      }
+    }
+
+    function getFacetColor(orient, annual_kwh, area) {
+      if (currentColorMode === 'aspect') {
+        return ASPECT_COLORS[orient] || 0x38bdf8;
+      } else if (currentColorMode === 'solar') {
+        const yield_per_m2 = (annual_kwh && area) ? (annual_kwh / area) : 200;
+        if (yield_per_m2 > 260) return 0xd97706; // Amber gold
+        if (yield_per_m2 > 210) return 0x10b981; // Emerald green
+        if (yield_per_m2 > 160) return 0x0284c7; // Sky blue
+        return 0x64748b; // Slate
+      } else if (currentColorMode === 'clay') {
+        return 0xb91c1c; // Deep terracotta red (User diagram)
+      } else {
+        return 0xf1f5f9; // Crisp white CAD solid
+      }
+    }
+
+    function build3DArchetype(arch) {
+      clearBuilding();
+      const L = arch.L, W = arch.W, Hg = arch.Hg, Hc = arch.Hc;
+      const hL = L / 2, hW = W / 2;
+
+      const wallMat = new THREE.MeshStandardMaterial({
+        color: currentColorMode === 'clay' ? 0x7f1d1d : 0x1e293b,
+        roughness: 0.6,
+        metalness: 0.1,
+        side: THREE.DoubleSide
+      });
+
+      roofGroup = new THREE.Group();
+      wallGroup = new THREE.Group();
+      ridgeGroup = new THREE.Group();
+      buildingGroup.add(wallGroup);
+      buildingGroup.add(roofGroup);
+      buildingGroup.add(ridgeGroup);
+
+      if (arch.id === 'M1') { // Flat
+        // Walls box
+        const wallGeo = new THREE.BoxGeometry(L, Hg, W);
+        const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+        wallMesh.position.y = Hg / 2;
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        wallGroup.add(wallMesh);
+
+        // 1 Roof Facet
+        const roofGeo = new THREE.PlaneGeometry(L, W);
+        roofGeo.rotateX(-Math.PI / 2);
+        const roofMat = new THREE.MeshStandardMaterial({
+          color: getFacetColor('Flat', arch.facets[0].yield, arch.facets[0].area),
+          roughness: 0.4, metalness: 0.2, side: THREE.DoubleSide
+        });
+        const roofMesh = new THREE.Mesh(roofGeo, roofMat);
+        roofMesh.position.y = Hg;
+        roofMesh.castShadow = true;
+        roofMesh.userData = { facet: arch.facets[0], normal: new THREE.Vector3(0, 1, 0), origY: Hg };
+        roofGroup.add(roofMesh);
+        facetMeshes.push(roofMesh);
+
+      } else if (arch.id === 'M4') { // Gable
+        // Walls
+        const wallGeo = new THREE.BoxGeometry(L, Hg, W);
+        const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+        wallMesh.position.y = Hg / 2;
+        wallMesh.castShadow = true;
+        wallGroup.add(wallMesh);
+
+        // Gable triangles on East and West ends
+        buildGableEnds(hL, hW, Hg, Hc, wallMat);
+
+        // 2 Roof Facets (South & North)
+        const slopeLen = Math.sqrt(hW * hW + (Hc - Hg) * (Hc - Hg));
+        const tiltRad = Math.atan2(Hc - Hg, hW);
+
+        // South Facet
+        const southGeo = new THREE.PlaneGeometry(L, slopeLen);
+        southGeo.rotateX(-tiltRad);
+        const southMat = new THREE.MeshStandardMaterial({
+          color: getFacetColor('South', arch.facets[0].yield, arch.facets[0].area),
+          roughness: 0.35, metalness: 0.15, side: THREE.DoubleSide
+        });
+        const southMesh = new THREE.Mesh(southGeo, southMat);
+        southMesh.position.set(0, (Hg + Hc) / 2, hW / 2);
+        southMesh.castShadow = true;
+        southMesh.userData = { facet: arch.facets[0], normal: new THREE.Vector3(0, Math.cos(tiltRad), Math.sin(tiltRad)), origPos: southMesh.position.clone() };
+        roofGroup.add(southMesh);
+        facetMeshes.push(southMesh);
+
+        // North Facet
+        const northGeo = new THREE.PlaneGeometry(L, slopeLen);
+        northGeo.rotateX(tiltRad);
+        const northMat = new THREE.MeshStandardMaterial({
+          color: getFacetColor('North', arch.facets[1].yield, arch.facets[1].area),
+          roughness: 0.35, metalness: 0.15, side: THREE.DoubleSide
+        });
+        const northMesh = new THREE.Mesh(northGeo, northMat);
+        northMesh.position.set(0, (Hg + Hc) / 2, -hW / 2);
+        northMesh.castShadow = true;
+        northMesh.userData = { facet: arch.facets[1], normal: new THREE.Vector3(0, Math.cos(tiltRad), -Math.sin(tiltRad)), origPos: northMesh.position.clone() };
+        roofGroup.add(northMesh);
+        facetMeshes.push(northMesh);
+
+        // Ridge Line
+        addRidgeLine([-hL, Hc, 0], [hL, Hc, 0]);
+
+      } else if (arch.id === 'M6') { // Hip
+        // Walls
+        const wallGeo = new THREE.BoxGeometry(L, Hg, W);
+        const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+        wallMesh.position.y = Hg / 2;
+        wallMesh.castShadow = true;
+        wallGroup.add(wallMesh);
+
+        const alpha = arch.alpha;
+        const rL = hL - alpha; // ridge half-length
+
+        // Vertices
+        const vSW = new THREE.Vector3(-hL, Hg, hW);
+        const vSE = new THREE.Vector3(hL, Hg, hW);
+        const vNE = new THREE.Vector3(hL, Hg, -hW);
+        const vNW = new THREE.Vector3(-hL, Hg, -hW);
+        const rW = new THREE.Vector3(-rL, Hc, 0);
+        const rE = new THREE.Vector3(rL, Hc, 0);
+
+        // 4 Facets
+        // South Trapezoid (SW, SE, rE, rW)
+        buildPolygonFacet([vSW, vSE, rE, rW], arch.facets[0], new THREE.Vector3(0, 0.9, 0.43).normalize());
+        // North Trapezoid (NE, NW, rW, rE)
+        buildPolygonFacet([vNE, vNW, rW, rE], arch.facets[1], new THREE.Vector3(0, 0.9, -0.43).normalize());
+        // West Triangle (NW, SW, rW)
+        buildPolygonFacet([vNW, vSW, rW], arch.facets[2], new THREE.Vector3(-0.43, 0.9, 0).normalize());
+        // East Triangle (SE, NE, rE)
+        buildPolygonFacet([vSE, vNE, rE], arch.facets[3], new THREE.Vector3(0.43, 0.9, 0).normalize());
+
+        // Ridge Line & Hip Lines
+        addRidgeLine([-rL, Hc, 0], [rL, Hc, 0]);
+        addRidgeLine([-hL, Hg, hW], [-rL, Hc, 0], 0x38bdf8);
+        addRidgeLine([hL, Hg, hW], [rL, Hc, 0], 0x38bdf8);
+        addRidgeLine([hL, Hg, -hW], [rL, Hc, 0], 0x38bdf8);
+        addRidgeLine([-hL, Hg, -hW], [-rL, Hc, 0], 0x38bdf8);
+
+      } else if (arch.id === 'M2') { // Shed
+        // Sloped single roof
+        const wallGeo = new THREE.BoxGeometry(L, (Hg + Hc)/2, W);
+        const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+        wallMesh.position.y = (Hg + Hc) / 4;
+        wallMesh.castShadow = true;
+        wallGroup.add(wallMesh);
+
+        const slopeLen = Math.sqrt(W * W + (Hc - Hg) * (Hc - Hg));
+        const tiltRad = Math.atan2(Hc - Hg, W);
+        const shedGeo = new THREE.PlaneGeometry(L, slopeLen);
+        shedGeo.rotateX(-tiltRad);
+        const shedMat = new THREE.MeshStandardMaterial({
+          color: getFacetColor('South', arch.facets[0].yield, arch.facets[0].area),
+          roughness: 0.35, metalness: 0.15, side: THREE.DoubleSide
+        });
+        const shedMesh = new THREE.Mesh(shedGeo, shedMat);
+        shedMesh.position.set(0, (Hg + Hc) / 2, 0);
+        shedMesh.castShadow = true;
+        shedMesh.userData = { facet: arch.facets[0], normal: new THREE.Vector3(0, Math.cos(tiltRad), Math.sin(tiltRad)), origPos: shedMesh.position.clone() };
+        roofGroup.add(shedMesh);
+        facetMeshes.push(shedMesh);
+
+      } else {
+        // Generic fallback gable / pyramidal
+        buildGenericGable(L, W, Hg, Hc, arch.facets);
+      }
+
+      applyExplode();
+    }
+
+    function build3DEmpirical(bldg) {
+      clearBuilding();
+      const Hg = bldg.z_eave || 4.5;
+      const Hc = bldg.z_ridge || 7.5;
+      const fp = bldg.footprint;
+
+      // Compute bounding box
+      let minX = 999, maxX = -999, minZ = 999, maxZ = -999;
+      fp.forEach(pt => {
+        if (pt[0] < minX) minX = pt[0];
+        if (pt[0] > maxX) maxX = pt[0];
+        if (pt[1] < minZ) minZ = pt[1];
+        if (pt[1] > maxZ) maxZ = pt[1];
+      });
+      const L = Math.max(6, maxX - minX);
+      const W = Math.max(5, maxZ - minZ);
+
+      let archId = 'M4';
+      if (bldg.roof_type.includes('Hip')) archId = 'M6';
+      else if (bldg.roof_type.includes('Flat')) archId = 'M1';
+      else if (bldg.roof_type.includes('Shed')) archId = 'M2';
+      else archId = 'M4';
+
+      // Adapt to archetype with real facets
+      const pseudoArch = {
+        id: archId,
+        orig_id: bldg.id,
+        code: bldg.code,
+        title: `${bldg.code} (${bldg.roof_type})`,
+        param: `Hg=${Hg}m, Hc=${Hc}m | ${bldg.area_m2} m²`,
+        roof_type: bldg.roof_type,
+        L: L, W: W, Hg: Hg, Hc: Hc, alpha: L * 0.22,
+        facets: bldg.facets.map(f => ({
+          name: f.name,
+          orient: f.orientation,
+          tilt: f.slope_deg || bldg.slope_deg,
+          az: f.aspect_deg || 180,
+          area: f.area_3d_m2,
+          yield: f.annual_yield_kwh || (f.area_3d_m2 * 210),
+          tier: f.suitability || 'High'
+        }))
+      };
+
+      build3DArchetype(pseudoArch);
+    }
+
+    function buildPolygonFacet(vertices, facetData, normal) {
+      const geom = new THREE.BufferGeometry();
+      const pos = [];
+      
+      // Triangulate convex quad or triangle
+      if (vertices.length === 3) {
+        pos.push(vertices[0].x, vertices[0].y, vertices[0].z);
+        pos.push(vertices[1].x, vertices[1].y, vertices[1].z);
+        pos.push(vertices[2].x, vertices[2].y, vertices[2].z);
+      } else if (vertices.length === 4) {
+        // Tri 1: 0, 1, 2
+        pos.push(vertices[0].x, vertices[0].y, vertices[0].z);
+        pos.push(vertices[1].x, vertices[1].y, vertices[1].z);
+        pos.push(vertices[2].x, vertices[2].y, vertices[2].z);
+        // Tri 2: 0, 2, 3
+        pos.push(vertices[0].x, vertices[0].y, vertices[0].z);
+        pos.push(vertices[2].x, vertices[2].y, vertices[2].z);
+        pos.push(vertices[3].x, vertices[3].y, vertices[3].z);
+      }
+
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geom.computeVertexNormals();
+
+      const mat = new THREE.MeshStandardMaterial({
+        color: getFacetColor(facetData.orient, facetData.yield, facetData.area),
+        roughness: 0.35, metalness: 0.15, side: THREE.DoubleSide
+      });
+
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData = {
+        facet: facetData,
+        normal: normal || new THREE.Vector3(0, 1, 0),
+        origPos: mesh.position.clone()
+      };
+      roofGroup.add(mesh);
+      facetMeshes.push(mesh);
+    }
+
+    function buildGableEnds(hL, hW, Hg, Hc, mat) {
+      // West gable end
+      const wGeo = new THREE.BufferGeometry();
+      wGeo.setAttribute('position', new THREE.Float32BufferAttribute([
+        -hL, Hg, -hW,
+        -hL, Hg, hW,
+        -hL, Hc, 0
+      ], 3));
+      wGeo.computeVertexNormals();
+      wallGroup.add(new THREE.Mesh(wGeo, mat));
+
+      // East gable end
+      const eGeo = new THREE.BufferGeometry();
+      eGeo.setAttribute('position', new THREE.Float32BufferAttribute([
+        hL, Hg, hW,
+        hL, Hg, -hW,
+        hL, Hc, 0
+      ], 3));
+      eGeo.computeVertexNormals();
+      wallGroup.add(new THREE.Mesh(eGeo, mat));
+    }
+
+    function buildGenericGable(L, W, Hg, Hc, facets) {
+      const hL = L/2, hW = W/2;
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, side: THREE.DoubleSide });
+      const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(L, Hg, W), wallMat);
+      wallMesh.position.y = Hg / 2;
+      wallMesh.castShadow = true;
+      wallGroup.add(wallMesh);
+      buildGableEnds(hL, hW, Hg, Hc, wallMat);
+      addRidgeLine([-hL, Hc, 0], [hL, Hc, 0]);
+
+      // 2 Sloped roof facets
+      const slopeLen = Math.sqrt(hW * hW + (Hc - Hg) * (Hc - Hg));
+      const tiltRad = Math.atan2(Hc - Hg, hW);
+
+      const f1 = (facets && facets[0]) || { orient: 'South', yield: 15000, area: L * slopeLen };
+      const geo1 = new THREE.PlaneGeometry(L, slopeLen);
+      geo1.rotateX(-tiltRad);
+      const mat1 = new THREE.MeshStandardMaterial({
+        color: getFacetColor(f1.orient || f1.orientation || 'South', f1.yield, f1.area),
+        roughness: 0.35, metalness: 0.15, side: THREE.DoubleSide
+      });
+      const mesh1 = new THREE.Mesh(geo1, mat1);
+      mesh1.position.set(0, (Hg + Hc) / 2, hW / 2);
+      mesh1.castShadow = true;
+      mesh1.userData = { facet: f1, normal: new THREE.Vector3(0, Math.cos(tiltRad), Math.sin(tiltRad)), origPos: mesh1.position.clone() };
+      roofGroup.add(mesh1);
+      facetMeshes.push(mesh1);
+
+      const f2 = (facets && facets[1]) || { orient: 'North', yield: 10000, area: L * slopeLen };
+      const geo2 = new THREE.PlaneGeometry(L, slopeLen);
+      geo2.rotateX(tiltRad);
+      const mat2 = new THREE.MeshStandardMaterial({
+        color: getFacetColor(f2.orient || f2.orientation || 'North', f2.yield, f2.area),
+        roughness: 0.35, metalness: 0.15, side: THREE.DoubleSide
+      });
+      const mesh2 = new THREE.Mesh(geo2, mat2);
+      mesh2.position.set(0, (Hg + Hc) / 2, -hW / 2);
+      mesh2.castShadow = true;
+      mesh2.userData = { facet: f2, normal: new THREE.Vector3(0, Math.cos(tiltRad), -Math.sin(tiltRad)), origPos: mesh2.position.clone() };
+      roofGroup.add(mesh2);
+      facetMeshes.push(mesh2);
+    }
+
+    function addRidgeLine(p1, p2, col = 0xfbbf24) {
+      const geom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(p1[0], p1[1] + 0.04, p1[2]),
+        new THREE.Vector3(p2[0], p2[1] + 0.04, p2[2])
+      ]);
+      const mat = new THREE.LineBasicMaterial({ color: col, linewidth: 3 });
+      ridgeGroup.add(new THREE.Line(geom, mat));
+    }
+
+    // =========================================================================
+    // EXPLODE FACETS LOGIC
+    // =========================================================================
+    function setExplode(val) {
+      explodeDistance = (val / 100) * 4.5;
+      document.getElementById('lbl-explode').textContent = `${val}%`;
+      applyExplode();
+    }
+
+    function applyExplode() {
+      facetMeshes.forEach(mesh => {
+        if (mesh.userData && mesh.userData.normal) {
+          const n = mesh.userData.normal;
+          const orig = mesh.userData.origPos || new THREE.Vector3(0, mesh.userData.origY || 0, 0);
+          mesh.position.copy(orig).addScaledVector(n, explodeDistance);
+        }
+      });
+    }
+
+    // =========================================================================
+    // VISUAL TOGGLES & MODES
+    // =========================================================================
+    function setColorMode(mode) {
+      currentColorMode = mode;
+      ['aspect', 'solar', 'clay', 'white'].forEach(m => {
+        const btn = document.getElementById(`btn-col-${m}`);
+        if (btn) btn.classList.toggle('active', m === mode);
+      });
+
+      if (currentData) {
+        if (currentMode === 'archetype') build3DArchetype(currentData);
+        else build3DEmpirical(currentData);
+      }
+    }
+
+    function toggleRidgeLines() {
+      showRidge = !showRidge;
+      document.getElementById('btn-toggle-ridge').classList.toggle('active', showRidge);
+      if (ridgeGroup) ridgeGroup.visible = showRidge;
+    }
+
+    function toggleShadows() {
+      showShadow = !showShadow;
+      document.getElementById('btn-toggle-shadow').classList.toggle('active', showShadow);
+      if (shadowMesh) shadowMesh.visible = showShadow;
+    }
+
+    function toggleWireframe() {
+      showWire = !showWire;
+      document.getElementById('btn-toggle-wire').classList.toggle('active', showWire);
+      facetMeshes.forEach(m => { if (m.material) m.material.wireframe = showWire; });
+    }
+
+    function toggleAutoRotate() {
+      autoRotate = !autoRotate;
+      document.getElementById('btn-toggle-rotate').classList.toggle('active', autoRotate);
+    }
+
+    // =========================================================================
+    // 2D PLAN RENDERING (SVG - Matching User Diagram)
+    // =========================================================================
+    function renderSvgPlan(L, W, type, paramVal) {
+      const svg = document.getElementById('plan-canvas');
+      const title = document.getElementById('plan-title');
+      const param = document.getElementById('plan-param');
+
+      title.textContent = currentData.title || `(${type}) roof.`;
+      param.textContent = currentData.param || `P = (Hg, Hc)`;
+
+      // Scale to 200x140
+      const pad = 25;
+      const sx = (200 - pad * 2) / 14;
+      const sy = (140 - pad * 2) / 10;
+      const sc = Math.min(sx, sy);
+
+      const rw = L * sc;
+      const rh = W * sc;
+      const ox = (200 - rw) / 2;
+      const oy = (140 - rh) / 2;
+
+      let inner = `
+        <rect x="${ox}" y="${oy}" width="${rw}" height="${rh}" fill="#f8fafc" stroke="#0f172a" stroke-width="2.5" />
+      `;
+
+      if (type === 'gable') {
+        const my = oy + rh / 2;
+        inner += `<line x1="${ox}" y1="${my}" x2="${ox + rw}" y2="${my}" stroke="#0f172a" stroke-width="2.2" />`;
+      } else if (type === 'hip') {
+        const my = oy + rh / 2;
+        const al = paramVal * sc;
+        inner += `
+          <line x1="${ox + al}" y1="${my}" x2="${ox + rw - al}" y2="${my}" stroke="#0f172a" stroke-width="2.2" />
+          <line x1="${ox}" y1="${oy}" x2="${ox + al}" y2="${my}" stroke="#0f172a" stroke-width="2.0" />
+          <line x1="${ox}" y1="${oy + rh}" x2="${ox + al}" y2="${my}" stroke="#0f172a" stroke-width="2.0" />
+          <line x1="${ox + rw}" y1="${oy}" x2="${ox + rw - al}" y2="${my}" stroke="#0f172a" stroke-width="2.0" />
+          <line x1="${ox + rw}" y1="${oy + rh}" x2="${ox + rw - al}" y2="${my}" stroke="#0f172a" stroke-width="2.0" />
+          
+          <!-- Param alpha dimension -->
+          <line x1="${ox}" y1="${oy - 8}" x2="${ox + al}" y2="${oy - 8}" stroke="#0284c7" stroke-width="1.5" />
+          <line x1="${ox}" y1="${oy}" x2="${ox}" y2="${oy - 12}" stroke="#0284c7" stroke-dasharray="2" />
+          <line x1="${ox + al}" y1="${my}" x2="${ox + al}" y2="${oy - 12}" stroke="#0284c7" stroke-dasharray="2" />
+          <text x="${ox + al / 2}" y="${oy - 11}" fill="#0284c7" font-size="11" font-weight="bold" text-anchor="middle">α</text>
+        `;
+      } else if (type === 'pyramid') {
+        const cx = ox + rw / 2;
+        const cy = oy + rh / 2;
+        inner += `
+          <line x1="${ox}" y1="${oy}" x2="${ox + rw}" y2="${oy + rh}" stroke="#0f172a" stroke-width="2.0" />
+          <line x1="${ox + rw}" y1="${oy}" x2="${ox}" y2="${oy + rh}" stroke="#0f172a" stroke-width="2.0" />
+        `;
+      } else if (type === 'compound') {
+        const splitX = ox + rw * 0.65;
+        const my = oy + rh / 2;
+        inner += `
+          <line x1="${splitX}" y1="${oy}" x2="${splitX}" y2="${oy + rh}" stroke="#d97706" stroke-width="2.2" stroke-dasharray="3" />
+          <line x1="${ox}" y1="${my}" x2="${splitX}" y2="${my}" stroke="#0f172a" stroke-width="2.0" />
+          <text x="${splitX + (ox + rw - splitX)/2}" y="${oy + rh/2 + 4}" fill="#7c3aed" font-size="10" font-weight="bold" text-anchor="middle">Deck</text>
+        `;
+      }
+
+      svg.innerHTML = inner;
+    }
+
+    function renderEmpiricalSvgPlan(bldg) {
+      const svg = document.getElementById('plan-canvas');
+      const title = document.getElementById('plan-title');
+      const param = document.getElementById('plan-param');
+
+      title.textContent = `${bldg.code} (${bldg.roof_type})`;
+      param.textContent = `A=${bldg.area_m2}m² | Slope=${bldg.slope_deg}° | ${bldg.facets.length} Facets`;
+
+      const fp = bldg.footprint;
+      let minX = 999, maxX = -999, minZ = 999, maxZ = -999;
+      fp.forEach(pt => {
+        if (pt[0] < minX) minX = pt[0];
+        if (pt[0] > maxX) maxX = pt[0];
+        if (pt[1] < minZ) minZ = pt[1];
+        if (pt[1] > maxZ) maxZ = pt[1];
+      });
+      const rw = maxX - minX;
+      const rh = maxZ - minZ;
+      const sc = Math.min(150 / Math.max(1, rw), 100 / Math.max(1, rh));
+
+      const ox = 100;
+      const oy = 70;
+      const polyPts = fp.map(pt => `${ox + pt[0] * sc},${oy - pt[1] * sc}`).join(' ');
+
+      let inner = `
+        <polygon points="${polyPts}" fill="#f8fafc" stroke="#0f172a" stroke-width="2.5" />
+      `;
+
+      // Ridge line if available
+      if (bldg.roof_type === 'Gable' || bldg.roof_type === 'Hip') {
+        inner += `<line x1="${ox - rw*sc*0.35}" y1="${oy}" x2="${ox + rw*sc*0.35}" y2="${oy}" stroke="#0f172a" stroke-width="2.2" />`;
+      }
+
+      svg.innerHTML = inner;
+    }
+
+    // =========================================================================
+    // METADATA & FACET CARDS
+    // =========================================================================
+    function updateMetadataCard(data) {
+      document.getElementById('bldg-id-tag').textContent = data.id || data.code;
+      document.getElementById('bldg-roof-type').textContent = data.roof_type;
+      document.getElementById('bldg-area').textContent = `${data.area_m2 || (data.L * data.W).toFixed(1)} m²`;
+      document.getElementById('bldg-heights').textContent = `${data.Hg || data.z_eave}m / ${data.Hc || data.z_ridge}m`;
+      document.getElementById('bldg-slope').textContent = `${data.slope_deg || (data.facets[0] ? data.facets[0].tilt : 25)}°`;
+      
+      const totalSolar = data.solar_kwh || data.facets.reduce((s, f) => s + (f.yield || 0), 0);
+      document.getElementById('bldg-solar').textContent = `${Math.round(totalSolar).toLocaleString()} kWh/yr`;
+      document.getElementById('facet-count-tag').textContent = `${data.facets.length} ระนาบ`;
+
+      // Render Facet Cards
+      const container = document.getElementById('facet-list-container');
+      container.innerHTML = '';
+
+      data.facets.forEach((f, idx) => {
+        const card = document.createElement('div');
+        card.className = 'facet-item';
+        card.onclick = () => highlightFacet(idx);
+
+        const orient = f.orient || f.orientation;
+        const colorHex = '#' + (ASPECT_COLORS[orient] || 0x38bdf8).toString(16).padStart(6, '0');
+
+        card.innerHTML = `
+          <div class="facet-header">
+            <span class="facet-name">${f.name}</span>
+            <span class="facet-badge" style="background:${colorHex}22; color:${colorHex}; border:1px solid ${colorHex}66;">
+              ${orient}
+            </span>
+          </div>
+          <div class="facet-stats">
+            <div>มุมเอียง (Tilt): <span class="stat-em">${f.tilt || f.slope_deg}°</span></div>
+            <div>มุมทิศ (Azimuth): <span class="stat-em">${f.az || f.aspect_deg || 0}°</span></div>
+            <div>พื้นที่ 3D: <span class="stat-em">${f.area || f.area_3d_m2} m²</span></div>
+            <div>ศักยภาพโซลาร์: <span class="stat-em" style="color:#fbbf24;">${Math.round(f.yield || f.annual_yield_kwh || 0).toLocaleString()} kWh</span></div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function highlightFacet(idx) {
+      const cards = document.querySelectorAll('.facet-item');
+      cards.forEach((c, i) => c.classList.toggle('selected', i === idx));
+
+      facetMeshes.forEach((mesh, i) => {
+        if (i === idx) {
+          mesh.material.emissive = new THREE.Color(0xf59e0b);
+          mesh.material.emissiveIntensity = 0.5;
+        } else {
+          mesh.material.emissive = new THREE.Color(0x000000);
+          mesh.material.emissiveIntensity = 0.0;
+        }
+      });
+    }
+  </script>
+</body>
+</html>
