@@ -24,6 +24,23 @@ const pendingActions = [];
 const deletedFacetIds = new Set();
 let isEditMode = false;
 let pendingChangesCount = 0;
+const basePath = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+
+// Initialize deletedFacetIds from sessionStorage to guarantee zero reversion on reload
+try {
+    const saved = sessionStorage.getItem('denchai_deleted_facet_ids');
+    if (saved) {
+        JSON.parse(saved).forEach(id => deletedFacetIds.add(String(id)));
+    }
+} catch (e) {
+    console.warn('Could not restore deleted facet ids from sessionStorage', e);
+}
+
+function saveDeletedIds() {
+    try {
+        sessionStorage.setItem('denchai_deleted_facet_ids', JSON.stringify(Array.from(deletedFacetIds)));
+    } catch (e) {}
+}
 
 // ── Top-Level Window API (Defined immediately to guarantee zero inline onclick errors) ──
 
@@ -203,6 +220,8 @@ window.restoreAllData = async function() {
         if (data.success) {
             showToast('✅ กู้คืนข้อมูลต้นฉบับสำเร็จเรียบร้อยแล้ว!');
             deletedFacetIds.clear();
+            sessionStorage.removeItem('denchai_deleted_facet_ids');
+            applyDeletedFacetsFilter();
             const buster = '?t=' + Date.now();
             if (map && map.getSource('solar-facets')) {
                 map.getSource('solar-facets').setData(basePath + 'data/denchai_solar_facets.geojson' + buster);
@@ -223,12 +242,17 @@ window.restoreAllData = async function() {
 
 window.deleteFacet = async function(facetId) {
     if (!facetId) return;
-    if (!confirm(`ยืนยันการลบระนาบ [${facetId}] ออกจากระบบและบันทึกลงไฟล์ GeoJSON ทันทีใช่หรือไม่?\n(เช่น ตรวจพบว่าเป็นถนนหรือพื้นดินที่แปลผลคลาดเคลื่อน)`)) {
-        return;
-    }
 
+    console.log('🗑️ Deleting facet:', facetId);
+    showToast(`⏳ กำลังตัดระนาบ [${facetId}] ออกจากระบบ...`);
+
+    // 1. Instant visual removal (0 ms feedback)
     deletedFacetIds.add(String(facetId));
+    saveDeletedIds();
     applyDeletedFacetsFilter();
+
+    const qaActions = document.getElementById('qa-selected-actions');
+    if (qaActions) qaActions.style.display = 'none';
 
     if (popup && popup.isOpen()) popup.remove();
 
@@ -243,9 +267,14 @@ window.deleteFacet = async function(facetId) {
             showToast(`💾 บันทึกสำเร็จ! ตัดระนาบ [${facetId}] เรียบร้อยแล้ว (คงเหลือ ${result.remaining_facets.toLocaleString()} ระนาบ) — กดปุ่ม 🚀 ซิงค์ขึ้น GitHub ด้านบนเพื่ออัปเดต repository`);
             if (denchaiStats) {
                 denchaiStats.total_facets = result.remaining_facets;
-                const kpiF = document.getElementById('kpi-facets');
-                if (kpiF) kpiF.textContent = result.remaining_facets.toLocaleString();
             }
+            const kpiF = document.getElementById('kpi-facets');
+            if (kpiF) kpiF.textContent = result.remaining_facets.toLocaleString();
+            const kpiSub = document.getElementById('kpi-sub-cap');
+            if (kpiSub) kpiSub.textContent = `รองรับการติดตั้งแผงโซลาร์เซลล์บนหลังคา ${result.remaining_facets.toLocaleString()} ระนาบ`;
+            const layerCount = document.getElementById('layer-facets-count');
+            if (layerCount) layerCount.textContent = `(${result.remaining_facets.toLocaleString()} ระนาบ)`;
+
             // Update map sources in real-time
             const buster = '?t=' + Date.now();
             if (map && map.getSource('solar-facets')) {
@@ -267,9 +296,29 @@ window.deleteFacet = async function(facetId) {
 
 window.deleteBuilding = async function(bldId) {
     if (!bldId) return;
-    if (!confirm(`ยืนยันการลบอาคาร [${bldId}] พร้อมระนาบหลังคาทั้งหมดของอาคารนี้ออกจากระบบใช่หรือไม่?\n(เหมาะสำหรับกรณีถนนหรือลานดินทั้งหลังที่โมเดลแปลผลผิด)`)) {
-        return;
+
+    console.log('🏢 Deleting building and all facets:', bldId);
+    showToast(`⏳ กำลังตัดแปลง [${bldId}] และลบทุกระนาบย่อย...`);
+
+    // 1. Instant client-side visual removal (0 ms feedback for all building facets)
+    try {
+        if (map && map.getSource('solar-facets')) {
+            const feats = map.querySourceFeatures('solar-facets', {
+                filter: ['==', ['get', 'building_id'], bldId]
+            });
+            feats.forEach(f => {
+                const fid = f.properties?.id || f.id;
+                if (fid) deletedFacetIds.add(String(fid));
+            });
+            saveDeletedIds();
+            applyDeletedFacetsFilter();
+        }
+    } catch (e) {
+        console.warn('Could not query features for instant building deletion', e);
     }
+
+    const qaActions = document.getElementById('qa-selected-actions');
+    if (qaActions) qaActions.style.display = 'none';
 
     if (popup && popup.isOpen()) popup.remove();
 
@@ -281,7 +330,25 @@ window.deleteBuilding = async function(bldId) {
         });
         const result = await res.json();
         if (result.success) {
-            showToast(`💾 บันทึกสำเร็จ! ลบอาคาร [${bldId}] (รวม ${result.deleted_facet_count} ระนาบ) เรียบร้อยแล้ว — กดปุ่ม 🚀 ซิงค์ขึ้น GitHub ด้านบนเพื่ออัปเดต`);
+            showToast(`💾 บันทึกสำเร็จ! ลบแปลง [${bldId}] (รวม ${result.deleted_facet_count} ระนาบ) เรียบร้อยแล้ว — กดปุ่ม 🚀 ซิงค์ขึ้น GitHub ด้านบนเพื่ออัปเดต`);
+            
+            // Add server-returned facet IDs to deletedFacetIds
+            if (result.deleted_facet_ids && Array.isArray(result.deleted_facet_ids)) {
+                result.deleted_facet_ids.forEach(id => deletedFacetIds.add(String(id)));
+                saveDeletedIds();
+                applyDeletedFacetsFilter();
+            }
+
+            if (denchaiStats) {
+                denchaiStats.total_facets = result.remaining_facets;
+            }
+            const kpiF = document.getElementById('kpi-facets');
+            if (kpiF) kpiF.textContent = result.remaining_facets.toLocaleString();
+            const kpiSub = document.getElementById('kpi-sub-cap');
+            if (kpiSub) kpiSub.textContent = `รองรับการติดตั้งแผงโซลาร์เซลล์บนหลังคา ${result.remaining_facets.toLocaleString()} ระนาบ`;
+            const layerCount = document.getElementById('layer-facets-count');
+            if (layerCount) layerCount.textContent = `(${result.remaining_facets.toLocaleString()} ระนาบ)`;
+
             // Force reload MapLibre sources
             const buster = '?t=' + Date.now();
             if (map && map.getSource('solar-facets')) {
@@ -290,11 +357,6 @@ window.deleteBuilding = async function(bldId) {
             if (map && map.getSource('denchai-buildings')) {
                 map.getSource('denchai-buildings').setData(basePath + 'data/denchai_buildings.geojson' + buster);
             }
-            if (denchaiStats) {
-                denchaiStats.total_facets = result.remaining_facets;
-                const kpiF = document.getElementById('kpi-facets');
-                if (kpiF) kpiF.textContent = result.remaining_facets.toLocaleString();
-            }
             pendingChangesCount++;
             window.updateGitStatusBadge();
         } else {
@@ -302,7 +364,7 @@ window.deleteBuilding = async function(bldId) {
         }
     } catch (err) {
         console.error('Delete building error:', err);
-        showToast(`⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์`);
+        showToast(`⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์: ${err.message}`);
     }
 };
 
@@ -328,15 +390,20 @@ window.exportCleanedGeoJSON = async function() {
 };
 
 function applyDeletedFacetsFilter() {
-    if (!isMapLoaded || deletedFacetIds.size === 0) return;
+    if (!map || !isMapLoaded) return;
     const delList = Array.from(deletedFacetIds);
-    const excludeFilter = ['!', ['in', ['to-string', ['get', 'id']], ['literal', delList]]];
-    const tierFilter = ['match', ['get', 'tier'], Array.from(activeTiers), true, false];
-    const combinedFilter = ['all', tierFilter, excludeFilter];
+    let facetFilter;
+    if (delList.length > 0) {
+        const excludeFilter = ['!', ['in', ['to-string', ['get', 'id']], ['literal', delList]]];
+        const tierFilter = ['match', ['get', 'tier'], Array.from(activeTiers), true, false];
+        facetFilter = ['all', tierFilter, excludeFilter];
+    } else {
+        facetFilter = ['match', ['get', 'tier'], Array.from(activeTiers), true, false];
+    }
 
-    if (map.getLayer('layer-facets-fill')) map.setFilter('layer-facets-fill', combinedFilter);
-    if (map.getLayer('layer-facets-stroke')) map.setFilter('layer-facets-stroke', combinedFilter);
-    if (map.getLayer('layer-facets-3d')) map.setFilter('layer-facets-3d', combinedFilter);
+    if (map.getLayer('layer-facets-fill')) map.setFilter('layer-facets-fill', facetFilter);
+    if (map.getLayer('layer-facets-stroke')) map.setFilter('layer-facets-stroke', facetFilter);
+    if (map.getLayer('layer-facets-3d')) map.setFilter('layer-facets-3d', facetFilter);
 }
 
 function showToast(msg) {
@@ -563,9 +630,10 @@ window.setDashboardMode = function(mode) {
 
         if (kpiLabelCount) kpiLabelCount.textContent = 'ระนาบหลังคาทั้งหมด';
         if (kpiUnitCount) kpiUnitCount.textContent = 'ระนาบ';
-        if (kpiFacets) kpiFacets.textContent = '16,573';
+        const facetTotal = denchaiStats?.total_facets || 16418;
+        if (kpiFacets) kpiFacets.textContent = facetTotal.toLocaleString();
         if (kpiSubArea) kpiSubArea.textContent = 'พื้นที่หลังคา 1,200,552 m²';
-        if (kpiSubCap) kpiSubCap.textContent = 'รองรับการติดตั้งแผงโซลาร์เซลล์บนหลังคา 16,573 ระนาบ';
+        if (kpiSubCap) kpiSubCap.textContent = `รองรับการติดตั้งแผงโซลาร์เซลล์บนหลังคา ${facetTotal.toLocaleString()} ระนาบ`;
 
         if (denchaiStats) {
             renderKPIs(denchaiStats, 'facets');
@@ -742,7 +810,8 @@ window.updateCostPerKwp = function(val) {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 Initializing Den Chai Solar WebGIS Engine (3D Facets & Buildings Mode)...');
 
-    const basePath = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+    // Base path is defined globally at top of file
+    // basePath = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
 
     // Attach explicit click listeners to prevent any inline event issues
     document.getElementById('btn-3d-city')?.addEventListener('click', window.toggle3DCity);
@@ -1184,7 +1253,7 @@ function showInspectorPopup(props, type, lngLat) {
     const kUsablePct = props.k_usable ? Math.round(props.k_usable * 100) : 60;
 
     const popupHtml = `
-        <div style="font-family: 'Inter', sans-serif; min-width: 290px;">
+        <div onclick="event.stopPropagation()" style="font-family: 'Inter', sans-serif; min-width: 290px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
                 <span style="font-size: 0.68rem; font-weight: 700; color: ${isBuilding ? '#38bdf8' : '#10b981'}; text-transform: uppercase;">
                     ${titleBadge}
@@ -1196,6 +1265,39 @@ function showInspectorPopup(props, type, lngLat) {
             <div style="font-size: 1.05rem; font-weight: 800; color: #fff; margin-bottom: 8px;">
                 ${titleLabel}
             </div>
+
+            <!-- SECTION QA EDIT & DELETE (PROMINENT AT TOP IN EDIT MODE) -->
+            ${isEditMode ? `
+            <div style="margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; background: rgba(234, 88, 12, 0.18); border: 1.5px solid #f97316; box-shadow: 0 4px 14px rgba(234, 88, 12, 0.35);">
+                <div style="font-size: 0.74rem; font-weight: 800; color: #fbbf24; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+                    <span>🛠️ โหมดแก้ไข: ตรวจพบสิ่งแปลปลอม</span>
+                    ${props.building_id ? `<span style="background: #ea580c; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.68rem; font-family: 'JetBrains Mono';">${props.building_id}</span>` : ''}
+                </div>
+                ${props.building_id ? `
+                <div style="font-size: 0.68rem; color: #fdba74; margin-bottom: 8px; line-height: 1.35; background: rgba(0,0,0,0.3); padding: 5px 8px; border-radius: 5px;">
+                    ⚠️ หากเป็นถนน/พื้นดิน แนะนำกดปุ่มส้ม <b>"ลบทั้งแปลงนี้ทันที"</b> เพื่อตัดทุก Facet ใน 1 คลิก
+                </div>` : ''}
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    ${props.building_id ? `
+                    <button onclick="event.stopPropagation(); window.deleteBuilding('${props.building_id}')" style="background: linear-gradient(135deg, #ea580c, #c2410c); border: 1px solid #ffedd5; color: #ffffff; padding: 9px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(234, 88, 12, 0.6); transition: all 0.2s;" onmouseover="this.style.filter='brightness(1.2)'" onmouseout="this.style.filter='none'" title="ลบอาคาร/ถนน ${props.building_id} ทั้งแปลง (ลบทุก Facet ใน 1 คลิก)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 21h18M3 7v14M21 7v14M6 11h4M6 15h4M14 11h4M14 15h4M9 3l3-2 3 2v4H9z"/></svg>
+                        <span>🏢 ลบทั้งแปลงนี้ทันที (${props.building_id})</span>
+                    </button>
+                    ` : ''}
+                    ${!isBuilding ? `
+                    <button onclick="event.stopPropagation(); window.deleteFacet('${props.id}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.6); color: #fca5a5; padding: 7px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.4)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'" title="ลบเฉพาะระนาบนี้">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        <span>🗑️ ลบเฉพาะ Facet นี้ (${props.id})</span>
+                    </button>
+                    ` : `
+                    <button onclick="event.stopPropagation(); window.deleteBuilding('${props.building_id || props.id}')" style="background: rgba(239, 68, 68, 0.25); border: 1px solid rgba(239, 68, 68, 0.6); color: #fca5a5; padding: 8px 12px; border-radius: 6px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.4)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.25)'" title="ลบอาคารนี้และระนาบทั้งหมดออกจากระบบ">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        <span>🗑️ ลบอาคารนี้ (ไม่ใช่หลังคา / ถนน)</span>
+                    </button>
+                    `}
+                </div>
+            </div>
+            ` : ''}
 
             <!-- Section 1: 3D Physical Surface Dimensions -->
             <div style="background: rgba(15, 23, 42, 0.6); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.25); margin-bottom: 8px;">
@@ -1251,51 +1353,58 @@ function showInspectorPopup(props, type, lngLat) {
             <div style="margin-top: 6px; font-size: 0.72rem; color: #10b981; display: flex; align-items: center; gap: 4px;">
                 🌱 ลดการปล่อยก๊าซเรือนกระจก: <b>${co2_ton} tCO₂e/ปี</b>
             </div>
-
-            <!-- Section 6: False Positive / Road Deletion Action (Conditional on isEditMode) -->
-            ${isEditMode ? `
-            <div style="margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: rgba(245, 158, 11, 0.08); border: 1px dashed rgba(245, 158, 11, 0.4);">
-                <div style="font-size: 0.68rem; font-weight: 700; color: #fbbf24; margin-bottom: 6px; display: flex; align-items: center; gap: 5px;">
-                    <span>🛠️ โหมดแก้ไข: ตรวจพบสิ่งแปลปลอม (False Positive)</span>
-                </div>
-                <div style="display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
-                    ${!isBuilding ? `
-                    <button onclick="window.deleteFacet('${props.id}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 5px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.4)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'" title="ลบเฉพาะระนาบนี้ออกจากระบบ">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                        <span>🗑️ ลบ Facet นี้ (ไม่ใช่หลังคา/ถนน)</span>
-                    </button>
-                    ${props.building_id ? `
-                    <button onclick="window.deleteBuilding('${props.building_id}')" style="background: rgba(234, 88, 12, 0.2); border: 1px solid rgba(234, 88, 12, 0.5); color: #fdba74; padding: 5px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;" onmouseover="this.style.background='rgba(234, 88, 12, 0.4)'" onmouseout="this.style.background='rgba(234, 88, 12, 0.2)'" title="ลบอาคาร ${props.building_id} ทั้งหลังรวมทุก Facet">
-                        <span>🏢 ลบอาคารนี้ทั้งหลัง</span>
-                    </button>
-                    ` : ''}
-                    ` : `
-                    <button onclick="window.deleteBuilding('${props.building_id || props.id}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 5px 12px; border-radius: 6px; font-size: 0.72rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.4)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'" title="ลบอาคารนี้และระนาบทั้งหมดออกจากระบบ">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                        <span>🗑️ ลบอาคารนี้ (ไม่ใช่หลังคา / ถนน)</span>
-                    </button>
-                    `}
-                </div>
-            </div>
-            ` : ''}
         </div>
     `;
 
     popup.setLngLat(lngLat).setHTML(popupHtml).addTo(map);
+
+    // Update Top QA Toolbar Quick Action if isEditMode
+    const qaActions = document.getElementById('qa-selected-actions');
+    const qaLabel = document.getElementById('qa-selected-label');
+    const qaBtnBld = document.getElementById('qa-btn-delete-bld');
+    const qaBtnFacet = document.getElementById('qa-btn-delete-facet');
+    if (qaActions && isEditMode) {
+        qaActions.style.display = 'flex';
+        if (qaLabel) qaLabel.textContent = `เลือก: ${props.building_id || props.id}`;
+        if (qaBtnBld) {
+            qaBtnBld.style.display = props.building_id ? 'inline-flex' : 'none';
+            qaBtnBld.onclick = () => window.deleteBuilding(props.building_id);
+            qaBtnBld.title = `ลบแปลง ${props.building_id} ทั้งหมด`;
+        }
+        if (qaBtnFacet) {
+            qaBtnFacet.style.display = !isBuilding ? 'inline-flex' : 'none';
+            qaBtnFacet.onclick = () => window.deleteFacet(props.id);
+            qaBtnFacet.title = `ลบเฉพาะ Facet ${props.id}`;
+        }
+    }
 }
 
 // ── Render Dynamic UI Data ──
 function renderKPIs(stats, mode) {
     if (!stats) return;
     const kpiCap = document.getElementById('kpi-capacity');
-    if (kpiCap) kpiCap.textContent = stats.total_capacity_mwp.toFixed(2);
+    if (kpiCap && stats.total_capacity_mwp !== undefined) kpiCap.textContent = stats.total_capacity_mwp.toFixed(2);
     const kpiGen = document.getElementById('kpi-generation');
-    if (kpiGen) kpiGen.textContent = stats.total_generation_gwh_yr.toFixed(2);
+    if (kpiGen && stats.total_generation_gwh_yr !== undefined) kpiGen.textContent = stats.total_generation_gwh_yr.toFixed(2);
     const dynamicSavings = (stats.total_generation_gwh_yr * 1e6 * currentTariff / 1e6).toFixed(2);
     const kpiSav = document.getElementById('kpi-savings');
     if (kpiSav) kpiSav.textContent = Number(dynamicSavings).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const kpiCo2 = document.getElementById('kpi-co2');
-    if (kpiCo2) kpiCo2.textContent = Math.round(stats.total_co2_offset_tons_yr).toLocaleString();
+    if (kpiCo2 && stats.total_co2_offset_tons_yr !== undefined) kpiCo2.textContent = Math.round(stats.total_co2_offset_tons_yr).toLocaleString();
+
+    // DYNAMIC FACETS COUNT UPDATE
+    const kpiFacets = document.getElementById('kpi-facets');
+    if (kpiFacets && stats.total_facets !== undefined) {
+        kpiFacets.textContent = stats.total_facets.toLocaleString();
+    }
+    const kpiSubCap = document.getElementById('kpi-sub-cap');
+    if (kpiSubCap && stats.total_facets !== undefined) {
+        kpiSubCap.textContent = `รองรับการติดตั้งแผงโซลาร์เซลล์บนหลังคา ${stats.total_facets.toLocaleString()} ระนาบ`;
+    }
+    const layerCount = document.getElementById('layer-facets-count');
+    if (layerCount && stats.total_facets !== undefined) {
+        layerCount.textContent = `(${stats.total_facets.toLocaleString()} ระนาบ)`;
+    }
 }
 
 function renderTierList(tiers) {

@@ -65,6 +65,11 @@ body {
 }
 
 /* MapLibre Popup Customization */
+.maplibregl-popup {
+    z-index: 9999 !important;
+    pointer-events: auto !important;
+}
+
 .maplibregl-popup-content {
     background: rgba(15, 23, 42, 0.95) !important;
     backdrop-filter: blur(12px) !important;
@@ -73,6 +78,9 @@ body {
     padding: 16px !important;
     color: var(--text-primary) !important;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6) !important;
+    max-height: 72vh !important;
+    overflow-y: auto !important;
+    pointer-events: auto !important;
 }
 
 .maplibregl-popup-anchor-bottom .maplibregl-popup-tip {

@@ -12,6 +12,7 @@ DATA_DIR = os.path.join(BASE_DIR, 'data')
 FACETS_PATH = os.path.join(DATA_DIR, 'denchai_solar_facets.geojson')
 BACKUP_PATH = os.path.join(DATA_DIR, 'denchai_solar_facets_backup.geojson')
 STATS_PATH = os.path.join(DATA_DIR, 'denchai_stats.json')
+STATS_BACKUP_PATH = os.path.join(DATA_DIR, 'denchai_stats_backup.json')
 
 BUILDINGS_PATH = os.path.join(DATA_DIR, 'denchai_buildings.geojson')
 BUILDINGS_BACKUP_PATH = os.path.join(DATA_DIR, 'denchai_buildings_backup.geojson')
@@ -35,6 +36,10 @@ if os.path.exists(FACETS_PATH) and not os.path.exists(BACKUP_PATH):
 if os.path.exists(BUILDINGS_PATH) and not os.path.exists(BUILDINGS_BACKUP_PATH):
     shutil.copy2(BUILDINGS_PATH, BUILDINGS_BACKUP_PATH)
     print(f"[BACKUP] Created initial buildings backup at: {BUILDINGS_BACKUP_PATH}")
+
+if os.path.exists(STATS_PATH) and not os.path.exists(STATS_BACKUP_PATH):
+    shutil.copy2(STATS_PATH, STATS_BACKUP_PATH)
+    print(f"[BACKUP] Created initial stats backup at: {STATS_BACKUP_PATH}")
 
 class WebGISHandler(http.server.SimpleHTTPRequestHandler):
     def send_head(self):
@@ -225,10 +230,18 @@ class WebGISHandler(http.server.SimpleHTTPRequestHandler):
             # Delete all facets of this building from denchai_solar_facets.geojson
             deleted_facet_count = 0
             remaining_facets = 0
+            deleted_facet_ids = []
             if os.path.exists(FACETS_PATH):
                 with open(FACETS_PATH, 'r', encoding='utf-8') as f:
                     f_data = json.load(f)
                 f_orig = len(f_data.get('features', []))
+                
+                deleted_facet_ids = [
+                    str(feat.get('id') or feat.get('properties', {}).get('id'))
+                    for feat in f_data.get('features', [])
+                    if str(feat.get('properties', {}).get('building_id')) == bld_id
+                ]
+
                 f_data['features'] = [
                     f for f in f_data.get('features', [])
                     if str(f.get('properties', {}).get('building_id')) != bld_id
@@ -259,12 +272,13 @@ class WebGISHandler(http.server.SimpleHTTPRequestHandler):
                             json.dump(stats, f, ensure_ascii=False, indent=2)
                         os.replace(temp_stats, STATS_PATH)
 
-            print(f"[QA BLD DELETION] Deleted building {bld_id} (and {deleted_facet_count} facets) | Remaining: {remaining_facets}", flush=True)
+            print(f"[QA BLD DELETION] Deleted building {bld_id} (and {deleted_facet_count} facets: {deleted_facet_ids}) | Remaining: {remaining_facets}", flush=True)
 
             return self.send_json(200, {
                 'success': True,
                 'building_id': bld_id,
                 'deleted_facet_count': deleted_facet_count,
+                'deleted_facet_ids': deleted_facet_ids,
                 'remaining_facets': remaining_facets
             })
 
@@ -273,8 +287,10 @@ class WebGISHandler(http.server.SimpleHTTPRequestHandler):
                 shutil.copy2(BACKUP_PATH, FACETS_PATH)
             if os.path.exists(BUILDINGS_BACKUP_PATH):
                 shutil.copy2(BUILDINGS_BACKUP_PATH, BUILDINGS_PATH)
-            print("[RESTORE] Restored all facets and buildings from backup", flush=True)
-            return self.send_json(200, {'success': True, 'message': 'Restored all facets and buildings from backup'})
+            if os.path.exists(STATS_BACKUP_PATH):
+                shutil.copy2(STATS_BACKUP_PATH, STATS_PATH)
+            print("[RESTORE] Restored all facets, buildings, and stats from backup", flush=True)
+            return self.send_json(200, {'success': True, 'message': 'Restored all facets, buildings, and stats from backup'})
 
         elif self.path == '/api/git_sync':
             content_length = int(self.headers.get('Content-Length', 0))
@@ -284,39 +300,31 @@ class WebGISHandler(http.server.SimpleHTTPRequestHandler):
             except Exception:
                 req = {}
             
-            commit_msg = req.get('message') or f"QA Update: Cleaned rooftop facets and false positives ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})"
+            commit_msg = req.get('message', '').strip()
+            if not commit_msg:
+                now_str = datetime.now().strftime('%d/%m/%Y %H:%M')
+                commit_msg = f"QA Data Cleaning: ปรับปรุงระนาบหลังคาและลบสิ่งแปลปลอม ({now_str})"
 
             try:
-                git_env = os.environ.copy()
-                git_env['PYTHONIOENCODING'] = 'utf-8'
-
-                # 1. git add -A
-                add_res = subprocess.run([GIT_PATH, 'add', '-A'], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace', env=git_env)
+                # 1. git add .
+                add_res = subprocess.run([GIT_PATH, 'add', '.'], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace')
                 if add_res.returncode != 0:
-                    return self.send_json(500, {'success': False, 'error': add_res.stderr or 'git add failed'})
+                    return self.send_json(500, {'success': False, 'error': f"Git add error: {add_res.stderr}"})
 
-                # Check if there is anything to commit
-                status_res = subprocess.run([GIT_PATH, 'status', '--porcelain'], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace', env=git_env)
-                if not status_res.stdout.strip():
-                    return self.send_json(200, {
-                        'success': True,
-                        'message': 'ข้อมูลเป็นปัจจุบันแล้ว ไม่มีรายการเปลี่ยนแปลงใหม่ที่ต้องบันทึก',
-                        'already_up_to_date': True
-                    })
-
-                # 2. git commit -m
-                commit_res = subprocess.run([GIT_PATH, 'commit', '-m', commit_msg], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace', env=git_env)
-                if commit_res.returncode != 0:
-                    return self.send_json(500, {'success': False, 'error': commit_res.stderr or 'git commit failed'})
+                # 2. git commit -m msg
+                commit_res = subprocess.run([GIT_PATH, 'commit', '-m', commit_msg], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace')
+                # If nothing to commit, return clean
+                if commit_res.returncode != 0 and 'nothing to commit' not in commit_res.stdout:
+                    return self.send_json(500, {'success': False, 'error': f"Git commit error: {commit_res.stderr or commit_res.stdout}"})
 
                 # 3. git push origin main
-                push_res = subprocess.run([GIT_PATH, 'push', 'origin', 'main'], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace', env=git_env)
+                push_res = subprocess.run([GIT_PATH, 'push', 'origin', 'main'], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace')
                 if push_res.returncode != 0:
-                    return self.send_json(500, {'success': False, 'error': push_res.stderr or 'git push failed'})
+                    return self.send_json(500, {'success': False, 'error': f"Git push error: {push_res.stderr}"})
 
-                # Get short commit hash
-                hash_res = subprocess.run([GIT_PATH, 'rev-parse', '--short', 'HEAD'], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace', env=git_env)
-                commit_hash = hash_res.stdout.strip()
+                # Get latest commit hash
+                log_res = subprocess.run([GIT_PATH, 'rev-parse', '--short', 'HEAD'], cwd=BASE_DIR, capture_output=True, text=True, encoding='utf-8', errors='replace')
+                commit_hash = log_res.stdout.strip()
 
                 print(f"[GIT SYNC] Successfully committed & pushed ({commit_hash}): {commit_msg}", flush=True)
 
@@ -337,9 +345,12 @@ class WebGISHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Connection', 'close')
             self.end_headers()
 
+class ThreadedHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
 if __name__ == '__main__':
     PORT = 8081
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(('', PORT), WebGISHandler) as httpd:
-        print(f"Denchai WebGIS running with NO-CACHE & QA Delete API on port {PORT}", flush=True)
+    with ThreadedHTTPServer(('', PORT), WebGISHandler) as httpd:
+        print(f"Denchai WebGIS running with NO-CACHE & QA Delete API on port {PORT} (Multi-Threaded)", flush=True)
         httpd.serve_forever()
